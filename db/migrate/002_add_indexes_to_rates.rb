@@ -1,3 +1,3 @@
-class AddIndexesToRates < ActiveRecord::Migration
+class AddIndexesToRates < ActiveRecord::Migration[4.2]
   def change; end
 end

@@ -7,7 +7,8 @@ module RedmineRate
       def self.included(base)
         base.send(:include, InstanceMethods)
         base.class_eval do
-          alias_method_chain :user_settings_tabs, :rate_tab
+          alias_method :user_settings_tabs_without_rate_tab, :user_settings_tabs
+          alias_method :user_settings_tabs, :user_settings_tabs_with_rate_tab
 
           # Similar to +project_options_for_select+ but allows selecting the active value
           def project_options_for_select_with_selected(projects, selected = nil)

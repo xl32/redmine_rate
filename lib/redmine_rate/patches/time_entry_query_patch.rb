@@ -4,8 +4,10 @@ module RedmineRate
       def self.included(base)
         base.send(:include, InstanceMethods)
         base.class_eval do
-          alias_method_chain :available_columns, :rate
-          alias_method_chain :initialize_available_filters, :rate
+          alias_method :initialize_available_filters_without_rate, :initialize_available_filters
+          alias_method :initialize_available_filters, :initialize_available_filters_with_rate
+          alias_method :available_columns_without_rate, :available_columns
+          alias_method :available_columns, :available_columns_with_rate
         end
       end
 

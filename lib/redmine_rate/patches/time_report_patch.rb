@@ -6,7 +6,8 @@ module RedmineRate
       def self.included(base)
         base.send(:include, InstanceMethods)
         base.class_eval do
-          alias_method_chain :load_available_criteria, :cost
+          alias_method :load_available_criteria_without_cost, :load_available_criteria
+          alias_method :load_available_criteria, :load_available_criteria_with_cost
         end
       end
 
