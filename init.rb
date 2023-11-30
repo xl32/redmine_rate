@@ -1,5 +1,4 @@
 require 'redmine'
-require 'redmine_rate'
 
 Redmine::Plugin.register :redmine_rate do
   name 'Rate'
