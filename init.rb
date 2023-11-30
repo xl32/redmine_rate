@@ -2,13 +2,13 @@ require 'redmine'
 
 Redmine::Plugin.register :redmine_rate do
   name 'Rate'
-  author 'AlphaNodes GmbH, Eric Davis'
-  url 'https://github.com/alphanodes/redmine_rate'
+  author 'Oleksandr Gerasymov, Oleksii Nechytailo'
+  url 'https://github.com/xl32/redmine_rate'
   description 'The Rate plugin provides an API that can be used to find the rate for a Member of a Project at a specific date.
                It also stores historical rate data so calculations will remain correct in the future.'
-  version '1.0.0'
+  version '1.1.0'
 
-  requires_redmine version_or_higher: '3.3.0'
+  requires_redmine version_or_higher: '5.0.0'
 
   default_settings = {
     last_caching_run: nil,
