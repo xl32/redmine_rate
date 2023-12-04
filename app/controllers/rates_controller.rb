@@ -86,7 +86,7 @@ class RatesController < ApplicationController
 
     respond_to do |format|
       # Locked rates will fail saving here.
-      if @rate.update_attributes rate_params
+      if @rate.update rate_params
         flash[:notice] = l(:rate_updated_message)
         format.html { redirect_back_or_default(rates_url(user_id: @rate.user_id)) }
         format.xml  { head :ok }

@@ -34,12 +34,12 @@ class RateTimeEntryPatchTest < ActiveSupport::TestCase
 
     context 'without a cache' do
       should 'return the calculated cost' do
-        @time_entry.update_attribute(:cost, nil)
+        @time_entry.update(:cost, nil)
         assert_equal 2000.0, @time_entry.cost
       end
 
       should 'cache the cost to the field' do
-        @time_entry.update_attribute(:cost, nil)
+        @time_entry.update(:cost, nil)
         @time_entry.cost
 
         assert_equal 2000.0, @time_entry.read_attribute(:cost)
@@ -49,7 +49,7 @@ class RateTimeEntryPatchTest < ActiveSupport::TestCase
 
     context 'with a cache' do
       setup do
-        @time_entry.update_attribute(:cost, 2000.0)
+        @time_entry.update(:cost, 2000.0)
         @time_entry.reload
       end
 
