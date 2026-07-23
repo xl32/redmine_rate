@@ -53,7 +53,7 @@ class RatesControllerTest < ActionController::TestCase
     end
 
     context 'responding to GET show' do
-      should_be_unauthorized { get :show, id: '37' }
+      should_be_unauthorized { get :show, params: { id: '37' } }
     end
 
     context 'responding to GET new' do
@@ -61,19 +61,19 @@ class RatesControllerTest < ActionController::TestCase
     end
 
     context 'responding to GET edit' do
-      should_be_unauthorized { get :edit, id: '37' }
+      should_be_unauthorized { get :edit, params: { id: '37' } }
     end
 
     context 'responding to POST create' do
-      should_be_unauthorized { post :create, rate: { these: 'params' } }
+      should_be_unauthorized { post :create, params: { rate: { these: 'params' } } }
     end
 
     context 'responding to PUT update' do
-      should_be_unauthorized { put :update, id: '37', rate: { these: 'params' } }
+      should_be_unauthorized { put :update, params: { id: '37', rate: { these: 'params' } } }
     end
 
     context 'responding to DELETE destroy' do
-      should_be_unauthorized { delete :destroy, id: '37' }
+      should_be_unauthorized { delete :destroy, params: { id: '37' } }
     end
   end
 
@@ -94,10 +94,11 @@ class RatesControllerTest < ActionController::TestCase
         assert_match(/not found/, flash[:error])
       end
 
-      context 'with mime type of xml' do
-        should 'should return a 404 error' do
-          @request.env['HTTP_ACCEPT'] = 'application/xml'
-          get :index
+      context 'via the read-only REST API' do
+        should 'return a 404 when no user_id is given' do
+          with_settings rest_api_enabled: '1' do
+            get :index, params: { key: @user.api_key }, format: 'xml'
+          end
           assert_response :not_found
         end
       end
@@ -109,20 +110,36 @@ class RatesControllerTest < ActionController::TestCase
       end
 
       should 'should expose all historic rates for the user as @rates' do
-        get :index, user_id: @user.id
+        get :index, params: { user_id: @user.id }
         assert_equal assigns(:rates), [@mock_rate]
       end
 
-      context 'with mime type of xml' do
-        should 'should render all rates as xml' do
-          @request.env['HTTP_ACCEPT'] = 'application/xml'
-          get :index, user_id: @user.id
+      context 'via the read-only REST API' do
+        should 'render all rates as xml' do
+          with_settings rest_api_enabled: '1' do
+            get :index, params: { user_id: @user.id, key: @user.api_key }, format: 'xml'
+          end
 
-          assert_select 'rates' do
+          assert_response :success
+          assert_select 'rates[type=array]' do
             assert_select 'rate' do
               assert_select 'id', text: @mock_rate.id.to_s
+              assert_select 'amount', text: /100/
+              assert_select 'date_in_effect'
+              assert_select 'locked', text: 'false'
             end
           end
+        end
+
+        should 'render all rates as json' do
+          with_settings rest_api_enabled: '1' do
+            get :index, params: { user_id: @user.id, key: @user.api_key }, format: 'json'
+          end
+
+          assert_response :success
+          json = ActiveSupport::JSON.decode(response.body)
+          assert_kind_of Array, json['rates']
+          assert_equal @mock_rate.id, json['rates'].first['id']
         end
       end
     end
@@ -133,19 +150,32 @@ class RatesControllerTest < ActionController::TestCase
       end
 
       should 'should expose the @requested rate as @rate' do
-        get :show, id: @mock_rate.id
+        get :show, params: { id: @mock_rate.id }
         assert_equal assigns(:rate), @mock_rate
       end
 
-      context 'with mime type of xml' do
-        should 'should render the requested rate as xml' do
-          @request.env['HTTP_ACCEPT'] = 'application/xml'
-          get :show, id: @mock_rate.id
+      context 'via the read-only REST API' do
+        should 'render the requested rate as xml' do
+          with_settings rest_api_enabled: '1' do
+            get :show, params: { id: @mock_rate.id, key: @user.api_key }, format: 'xml'
+          end
 
+          assert_response :success
           assert_select 'rate' do
             assert_select 'id', text: @mock_rate.id.to_s
             assert_select 'amount', text: /100/
+            assert_select 'locked', text: 'false'
           end
+        end
+
+        should 'render the requested rate as json' do
+          with_settings rest_api_enabled: '1' do
+            get :show, params: { id: @mock_rate.id, key: @user.api_key }, format: 'json'
+          end
+
+          assert_response :success
+          json = ActiveSupport::JSON.decode(response.body)
+          assert_equal @mock_rate.id, json['rate']['id']
         end
       end
     end
@@ -160,24 +190,16 @@ class RatesControllerTest < ActionController::TestCase
         get :new
         assert_match(/not found/, flash[:error])
       end
-
-      context 'with mime type of xml' do
-        should 'should return a 404 error' do
-          @request.env['HTTP_ACCEPT'] = 'application/xml'
-          get :new
-          assert_response :not_found
-        end
-      end
     end
 
     context 'responding to GET new with user' do
       should 'should be successful' do
-        get :new, user_id: @user.id
+        get :new, params: { user_id: @user.id }
         assert_response :success
       end
 
       should 'should expose a new rate as @rate' do
-        get :new, user_id: @user.id
+        get :new, params: { user_id: @user.id }
         assert assigns(:rate)
         assert assigns(:rate).new_record?
       end
@@ -189,7 +211,7 @@ class RatesControllerTest < ActionController::TestCase
       end
 
       should 'should expose the requested rate as @rate' do
-        get :edit, id: @mock_rate.id
+        get :edit, params: { id: @mock_rate.id }
         assert_equal assigns(:rate), @mock_rate
       end
 
@@ -199,13 +221,14 @@ class RatesControllerTest < ActionController::TestCase
         end
 
         should 'should not have a Update button' do
-          get :edit, id: @mock_rate.id
+          get :edit, params: { id: @mock_rate.id }
           assert_select 'input[type=submit]', count: 0
         end
 
         should 'should show the locked icon' do
-          get :edit, id: @mock_rate.id
-          assert_select "img[src*='locked.png']"
+          get :edit, params: { id: @mock_rate.id }
+          # Propshaft digests asset filenames (locked-<digest>.png), so match on the stem.
+          assert_select "img[src*='locked']"
         end
       end
     end
@@ -217,22 +240,22 @@ class RatesControllerTest < ActionController::TestCase
         end
 
         should 'should expose a newly created rate as @rate' do
-          post :create, rate: { project_id: @project.id, amount: '50', date_in_effect: Time.zone.today.to_s, user_id: @user.id }
+          post :create, params: { rate: { project_id: @project.id, amount: '50', date_in_effect: Time.zone.today.to_s, user_id: @user.id } }
           assert assigns(:rate)
         end
 
         should 'should redirect to the rate list' do
-          post :create, rate: { project_id: @project.id, amount: '50', date_in_effect: Time.zone.today.to_s, user_id: @user.id }
+          post :create, params: { rate: { project_id: @project.id, amount: '50', date_in_effect: Time.zone.today.to_s, user_id: @user.id } }
 
           assert_redirected_to rates_url(user_id: @user.id)
         end
 
         should 'should redirect to the back_url if set' do
           back_url = '/rates'
-          post :create, rate: { project_id: @project.id,
-                                amount: '50',
-                                date_in_effect: Time.zone.today.to_s,
-                                user_id: @user.id }, back_url: back_url
+          post :create, params: { rate: { project_id: @project.id,
+                                          amount: '50',
+                                          date_in_effect: Time.zone.today.to_s,
+                                          user_id: @user.id }, back_url: back_url }
 
           assert_redirected_to back_url
         end
@@ -240,12 +263,12 @@ class RatesControllerTest < ActionController::TestCase
 
       context 'with invalid params' do
         should 'should expose a newly created but unsaved rate as @rate' do
-          post :create, rate: { amount: 0 }
+          post :create, params: { rate: { amount: 0 } }
           assert assigns(:rate).new_record?
         end
 
         should "should re-render the 'new' template" do
-          post :create, rate: { amount: 0 }
+          post :create, params: { rate: { amount: 0 } }
           assert_template 'new'
         end
       end
@@ -258,26 +281,26 @@ class RatesControllerTest < ActionController::TestCase
         end
 
         should 'should update the requested rate' do
-          put :update, id: @mock_rate.id, rate: { amount: '150' }
+          put :update, params: { id: @mock_rate.id, rate: { amount: '150' } }
 
           assert_equal 150.0, @mock_rate.reload.amount
         end
 
         should 'should expose the requested rate as @rate' do
-          put :update, id: @mock_rate.id, rate: { amount: 0 }
+          put :update, params: { id: @mock_rate.id, rate: { amount: 0 } }
 
           assert_equal assigns(:rate), @mock_rate
         end
 
         should 'should redirect to the rate list' do
-          put :update, id: @mock_rate.id, rate: { amount: 0 }
+          put :update, params: { id: @mock_rate.id, rate: { amount: 0 } }
 
           assert_redirected_to rates_url(user_id: @user.id)
         end
 
         should 'should redirect to the back_url if set' do
           back_url = '/rates'
-          put :update, id: @mock_rate.id, back_url: back_url, rate: { amount: 0 }
+          put :update, params: { id: @mock_rate.id, back_url: back_url, rate: { amount: 0 } }
 
           assert_redirected_to back_url
         end
@@ -289,19 +312,19 @@ class RatesControllerTest < ActionController::TestCase
         end
 
         should 'should not update the requested rate' do
-          put :update, id: @mock_rate.id, rate: { amount: 'asdf' }
+          put :update, params: { id: @mock_rate.id, rate: { amount: 'asdf' } }
 
           assert_equal 100.0, @mock_rate.reload.amount
         end
 
         should 'should expose the rate as @rate' do
-          put :update, id: @mock_rate.id, rate: { amount: 'asdf' }
+          put :update, params: { id: @mock_rate.id, rate: { amount: 'asdf' } }
 
           assert_equal assigns(:rate), @mock_rate
         end
 
         should "should re-render the 'edit' template" do
-          put :update, id: @mock_rate.id, rate: { amount: 'asdf' }
+          put :update, params: { id: @mock_rate.id, rate: { amount: 'asdf' } }
 
           assert_template 'edit'
         end
@@ -313,25 +336,25 @@ class RatesControllerTest < ActionController::TestCase
         end
 
         should 'should not save the rate' do
-          put :update, id: @mock_rate.id, rate: { amount: 150 }
+          put :update, params: { id: @mock_rate.id, rate: { amount: 150 } }
 
           assert_equal 100, @mock_rate.reload.amount
         end
 
         should 'should set the locked rate as @rate' do
-          put :update, id: @mock_rate.id, rate: { amount: 200 }
+          put :update, params: { id: @mock_rate.id, rate: { amount: 200 } }
 
           assert_equal assigns(:rate), @mock_rate
         end
 
         should "should re-render the 'edit' template" do
-          put :update, id: @mock_rate.id, rate: { amount: 0 }
+          put :update, params: { id: @mock_rate.id, rate: { amount: 0 } }
 
           assert_template 'edit'
         end
 
         should 'should render an error message' do
-          put :update, id: @mock_rate.id, rate: { amount: 0 }
+          put :update, params: { id: @mock_rate.id, rate: { amount: 0 } }
 
           assert_match(/locked/, flash[:error])
         end
@@ -345,18 +368,18 @@ class RatesControllerTest < ActionController::TestCase
 
       should 'should destroy the requested rate' do
         assert_difference('Rate.count', -1) do
-          delete :destroy, id: @mock_rate.id
+          delete :destroy, params: { id: @mock_rate.id }
         end
       end
 
       should "should redirect to the user's rates list" do
-        delete :destroy, id: @mock_rate.id
+        delete :destroy, params: { id: @mock_rate.id }
         assert_redirected_to rates_url(user_id: @user.id)
       end
 
       should 'should redirect to the back_url if set' do
         back_url = '/rates'
-        delete :destroy, id: @mock_rate.id, back_url: back_url, rate: { amount: 0 }
+        delete :destroy, params: { id: @mock_rate.id, back_url: back_url, rate: { amount: 0 } }
 
         assert_redirected_to back_url
       end
@@ -367,9 +390,81 @@ class RatesControllerTest < ActionController::TestCase
         end
 
         should 'should display an error message' do
-          delete :destroy, id: @mock_rate.id
+          delete :destroy, params: { id: @mock_rate.id }
           assert_match(/locked/, flash[:error])
         end
+      end
+    end
+
+    context 'write access via the REST API' do
+      setup do
+        @project = Project.generate!
+      end
+
+      should 'create a rate and return 201' do
+        with_settings rest_api_enabled: '1' do
+          assert_difference 'Rate.count', 1 do
+            post :create,
+                 params: { key: @user.api_key,
+                           rate: { project_id: @project.id, amount: '75',
+                                   date_in_effect: Time.zone.today.to_s, user_id: @user.id } },
+                 format: 'json'
+          end
+        end
+
+        assert_response :created
+        json = ActiveSupport::JSON.decode(response.body)
+        assert_equal 75.0, json['rate']['amount'].to_f
+      end
+
+      should 'return 422 when creating with invalid params' do
+        with_settings rest_api_enabled: '1' do
+          post :create, params: { key: @user.api_key, rate: { amount: 'not-a-number' } }, format: 'json'
+        end
+
+        assert_response 422
+      end
+
+      should 'update a rate and return 204' do
+        rate = mock_rate
+        with_settings rest_api_enabled: '1' do
+          put :update, params: { key: @user.api_key, id: rate.id, rate: { amount: '175' } }, format: 'json'
+        end
+
+        assert_response :no_content
+        assert_equal 175.0, rate.reload.amount
+      end
+
+      should 'return 422 when updating a locked rate' do
+        rate = mock_locked_rate
+        with_settings rest_api_enabled: '1' do
+          put :update, params: { key: @user.api_key, id: rate.id, rate: { amount: '175' } }, format: 'json'
+        end
+
+        assert_response 422
+        assert_equal 100.0, rate.reload.amount
+      end
+
+      should 'delete a rate and return 204' do
+        rate = mock_rate
+        with_settings rest_api_enabled: '1' do
+          assert_difference 'Rate.count', -1 do
+            delete :destroy, params: { key: @user.api_key, id: rate.id }, format: 'json'
+          end
+        end
+
+        assert_response :no_content
+      end
+
+      should 'return 422 when deleting a locked rate' do
+        rate = mock_locked_rate
+        with_settings rest_api_enabled: '1' do
+          assert_no_difference 'Rate.count' do
+            delete :destroy, params: { key: @user.api_key, id: rate.id }, format: 'json'
+          end
+        end
+
+        assert_response 422
       end
     end
   end

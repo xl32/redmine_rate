@@ -4,3 +4,4 @@ coverage/
 .project
 .settings/
 /gitconfig
+/.devtest/

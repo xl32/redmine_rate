@@ -1,84 +1,200 @@
 = Redmine Rate Plugin
 
-The Rate plugin stores billable rates for Users.  It also provides an API that can be used to find the rate for a Member of a Project at a specific date.
+The Rate plugin stores billable rates for Users. It provides a Ruby API to find
+the rate for a Member of a Project at a specific date, and a read-only REST API
+to query stored rates.
 
 == Requirements
 
-* Redmine version >= 5.0 (tested with Redmine 5.0.x/5.1.x on Rails 6.1, 6.0.x/6.1.x on Rails 7.x, and 7.0.x on Rails 8.0)
+* Redmine >= 5.0. Tested with Redmine 5.0.x/5.1.x (Rails 6.1), 6.0.x/6.1.x
+  (Rails 7.x) and 7.0.x (Rails 8.0).
 
 == Features
 
 * Track rates for a user based on
-  * Date Rate came into effect and
-  * the Project
+  * the date the rate came into effect and
+  * the project
 * Store historic rate amounts
-* Lock rates to preserve historic calculations
-* Rate.for API for other plugins
-* Flag time entry as billable (with bulk support)
-
+* Lock rates to preserve historic calculations (a rate becomes locked once a
+  time entry references it)
+* +Rate.for+ Ruby API for other plugins
+* Read-only REST API (XML/JSON) to query rates
+* Flag time entries as billable (with bulk support)
 
 == Installation
 
-To install the ``redmine_rate``, execute the following commands from the root of your redmine directory, assuming that your RAILS_ENV environment variable is set to "production":
+From the root of your Redmine directory (with RAILS_ENV set to "production"):
 
- cd $REDMINE_ROOT
- git clone https://github.com/alphanodes/redmine_rate.git plugins/redmine_rate
- bundle install --without development test
- bundle exec rake redmine:plugins:migrate NAME=redmine_rate RAILS_ENV=production
+  cd $REDMINE_ROOT
+  git clone https://github.com/xl32/redmine_rate.git plugins/redmine_rate
+  bundle config set --local without 'development test'
+  bundle install
+  bundle exec rake redmine:plugins:migrate NAME=redmine_rate RAILS_ENV=production
 
-Restart your application server (apache with passenger, nginx with passenger, unicorn, puma, etc.) and ``redmine_rate`` is ready to use.
+Restart your application server (Passenger, Puma, Unicorn, etc.) and the plugin
+is ready to use.
 
-More information on installing Redmine plugins can be found here: https://www.redmine.org/wiki/redmine/Plugins
+More information on installing Redmine plugins:
+https://www.redmine.org/projects/redmine/wiki/Plugins
 
+== Uninstall
 
-## Uninstall
+  cd $REDMINE_ROOT
+  bundle exec rake redmine:plugins:migrate NAME=redmine_rate VERSION=0 RAILS_ENV=production
+  rm -rf plugins/redmine_rate
 
-Uninstall ``redmine_rate``.
-
-    cd $REDMINE_ROOT
-    bundle exec rake redmine:plugins:migrate NAME=redmine_rate VERSION=0 RAILS_ENV=production
-    rm -rf plugins/redmine_rate
-
-Restart Redmine (application server)
+Restart your application server.
 
 == Usage
 
-=== Enter new rate for a project
+=== Enter a new rate for a project
 
-There are two ways to set rates for a Member of a Project.
+There are two ways to set a rate for a member of a project.
+
+From the project:
 
 1. Browse to the Project Settings page
 2. Select the Members tab
-3. Enter the rate for the Member and click the set Rate
+3. Enter the rate for the member and click "Set Rate"
 
-Alternatively, Rates can be set in the User Administration panel
+From the administration panel:
 
-1. Browse to the Administration panel
+1. Browse to Administration
 2. Select Users
-3. Select the specific user to add a rate for
-4. Select the Membership tab and enter a rate for each project
-4. Or, select the Rate History and enter a new rate in the form
+3. Select the user
+4. Select the Rate History tab and enter a new rate in the form
 
-=== Enter default rate for a user
+=== Enter a default rate for a user
 
-A default rate is a user's Rate that doesn't correspond to a specific project.  It can be set in the User Administration panel:
+A default rate is a user's rate that is not tied to a specific project. Set it
+in the administration panel:
 
-1. Browse to the Administration panel
+1. Browse to Administration
 2. Select Users
-3. Select the specific user to add a rate for
-4. Select the Rate History and enter a new rate in the form, keep the Project field set to Default Rate.
+3. Select the user
+4. Select the Rate History tab and enter a new rate, leaving the Project field
+   set to "Default Rate"
 
-=== Lock a Rate
+=== Lock a rate
 
-Currently this feature is only available through the Rate API.  A Rate will become locked once a valid TimeEntry is assigned to the Rate.
+A rate becomes locked automatically once a valid time entry is assigned to it.
+Locked rates can no longer be edited or deleted, which preserves the correctness
+of historic cost calculations.
 
 === Caching
 
-The plugin includes some simple caching for time entries cost.
-Instead of doing a lookup for each time entry, the rate plugin will cache the total cost for each time entry to the database.
-The caching is done transparently but you can run and purge the caches from the Administration Panel or
-using the provided rate tasks (rake rate_plugin:cache:update_cost_cache, rake rate_plugin:cache:refresh_cost_cache).
+The plugin caches the total cost of each time entry in the database instead of
+recomputing it on every lookup. Caching happens transparently, and you can run
+or purge the caches from the administration panel or with the provided rake
+tasks:
+
+  bundle exec rake rate_plugin:cache:update_cost_cache   # cache entries missing a cost
+  bundle exec rake rate_plugin:cache:refresh_cost_cache  # clear and recompute all costs
+
+== Ruby API
+
+Other plugins can look up rates directly:
+
+  Rate.for(user, project = nil, date = Date.current.to_s)  # => Rate or nil
+  Rate.amount_for(user, project = nil, date)               # => BigDecimal or nil
+
+If no project-specific rate exists, +Rate.for+ falls back to the user's default
+(project-independent) rate.
+
+== REST API
+
+The plugin exposes a REST API in the standard Redmine style; both XML and JSON
+are supported.
+
+Prerequisites:
+
+* Enable "REST web service" under Administration -> Settings -> API.
+* Every endpoint (read and write) requires administrator privileges, so
+  authenticate with an admin user's API key, passed either in the
+  +X-Redmine-API-Key+ header or as a +key+ query parameter.
+
+=== List a user's rate history
+
+  GET /rates.json?user_id=:user_id
+  GET /rates.xml?user_id=:user_id
+
+The +user_id+ parameter is required; an unknown user returns 404.
+
+  curl -H "X-Redmine-API-Key: <admin_api_key>" \
+       "https://redmine.example.com/rates.json?user_id=42"
+
+  {
+    "rates": [
+      {
+        "id": 7,
+        "amount": "100.0",
+        "date_in_effect": "2026-01-01",
+        "locked": false,
+        "user": { "id": 42, "name": "Jane Doe" },
+        "project": { "id": 3, "name": "Website" }
+      }
+    ]
+  }
+
+A rate without a +project+ element is the user's default rate. +locked+ is true
+when the rate already has time entries and can no longer be changed.
+
+=== Show a single rate
+
+  GET /rates/:id.json
+  GET /rates/:id.xml
+
+  curl -H "X-Redmine-API-Key: <admin_api_key>" \
+       "https://redmine.example.com/rates/7.xml"
+
+  <?xml version="1.0" encoding="UTF-8"?>
+  <rate>
+    <id>7</id>
+    <amount>100.0</amount>
+    <date_in_effect>2026-01-01</date_in_effect>
+    <locked>false</locked>
+    <user id="42" name="Jane Doe"/>
+    <project id="3" name="Website"/>
+  </rate>
+
+=== Create a rate
+
+  POST /rates.json
+  POST /rates.xml
+
+Send a +rate+ object with +user_id+, +amount+, +date_in_effect+ and (optionally)
++project_id+. Returns 201 Created with the new rate, or 422 with the validation
+errors.
+
+  curl -X POST -H "X-Redmine-API-Key: <admin_api_key>" \
+       -H "Content-Type: application/json" \
+       -d '{"rate": {"user_id": 42, "project_id": 3, "amount": "120.0", "date_in_effect": "2026-02-01"}}' \
+       "https://redmine.example.com/rates.json"
+
+=== Update a rate
+
+  PUT /rates/:id.json
+  PUT /rates/:id.xml
+
+Returns 204 No Content on success, or 422 with errors. A locked rate (one that
+already has time entries) cannot be changed and returns 422.
+
+  curl -X PUT -H "X-Redmine-API-Key: <admin_api_key>" \
+       -H "Content-Type: application/json" \
+       -d '{"rate": {"amount": "150.0"}}' \
+       "https://redmine.example.com/rates/7.json"
+
+=== Delete a rate
+
+  DELETE /rates/:id.json
+  DELETE /rates/:id.xml
+
+Returns 204 No Content on success. A locked rate cannot be deleted and returns
+422.
+
+  curl -X DELETE -H "X-Redmine-API-Key: <admin_api_key>" \
+       "https://redmine.example.com/rates/7.json"
 
 == License
 
-This plugin is licensed under the GNU GPL v2.  See COPYRIGHT.txt and GPL.txt for details.
+This plugin is licensed under the GNU GPL v2. See COPYRIGHT.txt for details.

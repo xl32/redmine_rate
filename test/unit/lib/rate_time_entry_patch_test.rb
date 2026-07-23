@@ -5,7 +5,9 @@ class RateTimeEntryPatchTest < ActiveSupport::TestCase
     @user = User.generate!
     @project = Project.generate!
     @date = Time.zone.today.to_s
-    @time_entry = TimeEntry.new(user: @user, project: @project, spent_on: @date, hours: 10.0, activity: TimeEntryActivity.generate!)
+    # author must equal user, otherwise Redmine's TimeEntry validation requires
+    # the user to be an assignable project member (see #validate_time_entry).
+    @time_entry = TimeEntry.new(author: @user, user: @user, project: @project, spent_on: @date, hours: 10.0, activity: TimeEntryActivity.generate!)
     @rate = Rate.generate!(user: @user, project: @project, date_in_effect: @date, amount: 200.0)
   end
 
@@ -34,12 +36,12 @@ class RateTimeEntryPatchTest < ActiveSupport::TestCase
 
     context 'without a cache' do
       should 'return the calculated cost' do
-        @time_entry.update(:cost, nil)
+        @time_entry.update_attribute(:cost, nil)
         assert_equal 2000.0, @time_entry.cost
       end
 
       should 'cache the cost to the field' do
-        @time_entry.update(:cost, nil)
+        @time_entry.update_attribute(:cost, nil)
         @time_entry.cost
 
         assert_equal 2000.0, @time_entry.read_attribute(:cost)
@@ -49,7 +51,7 @@ class RateTimeEntryPatchTest < ActiveSupport::TestCase
 
     context 'with a cache' do
       setup do
-        @time_entry.update(:cost, 2000.0)
+        @time_entry.update_attribute(:cost, 2000.0)
         @time_entry.reload
       end
 

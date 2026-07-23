@@ -1,0 +1,3 @@
+api.array :rates do
+  @rates.each { |rate| render_api_rate api, rate }
+end

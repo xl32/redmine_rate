@@ -1,34 +1,54 @@
 module RedmineRate
-  def self.settings
-    ActionController::Parameters.new(Setting[:plugin_redmine_rate])
-  end
+  class << self
+    def settings
+      ActionController::Parameters.new(Setting[:plugin_redmine_rate])
+    end
 
-  def self.setting?(value)
-    return true if settings[value].to_i == 1
-    false
-  end
-end
+    def setting?(value)
+      return true if settings[value].to_i == 1
 
-Rails.configuration.to_prepare do
-  # Patches
-  require 'redmine_rate/patches/issue_patch'
-  require 'redmine_rate/patches/issue_query_patch'
-  require 'redmine_rate/patches/time_entry_patch'
-  require 'redmine_rate/patches/time_entry_query_patch'
-  require 'redmine_rate/patches/time_report_patch'
-  require 'redmine_rate/patches/users_helper_patch'
-  require 'redmine_rate/patches/queries_helper_patch'
+      false
+    end
 
-  # Global helpers
-  require_dependency 'redmine_rate/helpers'
+    # Loads the plugin's patches, helpers and hooks and registers the Deface
+    # overrides path.
+    #
+    # This is called from init.rb, which Redmine executes inside a `to_prepare`
+    # block, so it runs at boot in every environment. The previous approach --
+    # a top-level `Rails.configuration.to_prepare` in this file -- only worked
+    # when the plugin lib was eager loaded (production): with eager_load
+    # disabled (development and test) this file was merely autoloaded lazily, so
+    # the block never registered in time and TimeEntry/Issue/etc. were left
+    # unpatched.
+    def setup!
+      # Referencing each constant makes Zeitwerk load its file; the file body
+      # applies the patch to its target class (or self-registers, for the
+      # helpers module and the hook listener). require/require_dependency can't
+      # be used here: the plugin lib is on Zeitwerk's autoload path, not $LOAD_PATH.
+      [
+        Patches::IssuePatch,
+        Patches::IssueQueryPatch,
+        Patches::TimeEntryPatch,
+        Patches::TimeEntryQueryPatch,
+        Patches::TimeReportPatch,
+        Patches::UsersHelperPatch,
+        Patches::QueriesHelperPatch,
+        Helpers,
+        Hooks
+      ].each(&:name)
 
-  # Hooks
-  require_dependency 'redmine_rate/hooks'
+      register_overrides_path
+    end
 
-  # include deface overwrites
-  Rails.application.paths['app/overrides'] ||= []
-  rate_overwrite_dir = "#{Redmine::Plugin.directory}/redmine_rate/app/overrides".freeze
-  unless Rails.application.paths['app/overrides'].include?(rate_overwrite_dir)
-    Rails.application.paths['app/overrides'] << rate_overwrite_dir
+    private
+
+    # include deface overwrites
+    def register_overrides_path
+      Rails.application.paths['app/overrides'] ||= []
+      dir = "#{Redmine::Plugin.directory}/redmine_rate/app/overrides".freeze
+      return if Rails.application.paths['app/overrides'].include?(dir)
+
+      Rails.application.paths['app/overrides'] << dir
+    end
   end
 end

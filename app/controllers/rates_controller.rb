@@ -7,6 +7,10 @@ class RatesController < ApplicationController
   before_action :require_user_id, only: %i[index new]
   before_action :set_back_url
 
+  # REST API: allows API key / basic auth. All actions require admin
+  # (see require_admin above), so the API is effectively admin-only.
+  accept_api_auth :index, :show, :create, :update, :destroy
+
   VALID_SORT_OPTIONS = {
     'date_in_effect' => "#{Rate.table_name}.date_in_effect",
     'project_id' => "#{Project.table_name}.name"
@@ -23,31 +27,26 @@ class RatesController < ApplicationController
 
     respond_to do |format|
       format.html { render action: 'index', layout: !request.xhr? }
-      format.xml  { render xml: @rates }
+      format.api  # index.api.rsb
       format.js
     end
   end
 
   # GET /rates/1
   # GET /rates/1.xml
+  # GET /rates/1.json
   def show
     @rate = Rate.find(params[:id])
 
     respond_to do |format|
       format.html # show.html.erb
-      format.xml  { render xml: @rate }
+      format.api  # show.api.rsb
     end
   end
 
   # GET /rates/new?user_id=1
-  # GET /rates/new.xml?user_id=1
   def new
     @rate = Rate.new(user_id: @user.id)
-
-    respond_to do |format|
-      format.html # new.html.erb
-      format.xml  { render xml: @rate }
-    end
   end
 
   # GET /rates/1/edit
@@ -57,6 +56,7 @@ class RatesController < ApplicationController
 
   # POST /rates
   # POST /rates.xml
+  # POST /rates.json
   def create
     @rate = Rate.new(rate_params)
 
@@ -66,46 +66,49 @@ class RatesController < ApplicationController
           flash[:notice] = l(:rate_created_message)
           redirect_back_or_default(rates_url(user_id: @rate.user_id))
         end
-        format.xml  { render xml: @rate, status: :created, location: @rate }
         format.js { render action: :create }
+        format.api { render action: 'show', status: :created, location: rate_url(@rate) }
       else
         format.html { render action: 'new' }
-        format.xml  { render xml: @rate.errors, status: :unprocessable_entity }
         format.js do
           flash.now[:error] = l(:rate_error_creating_new_rate)
           render action: :create_error
         end
+        format.api { render_validation_errors(@rate) }
       end
     end
   end
 
   # PUT /rates/1
   # PUT /rates/1.xml
+  # PUT /rates/1.json
   def update
     @rate = Rate.find(params[:id])
 
     respond_to do |format|
-      # Locked rates will fail saving here.
+      # Locked rates will fail saving here (before_save aborts the callback chain).
       if @rate.update rate_params
         flash[:notice] = l(:rate_updated_message)
         format.html { redirect_back_or_default(rates_url(user_id: @rate.user_id)) }
-        format.xml  { head :ok }
+        format.api { render_api_ok }
       else
         if @rate.locked?
           flash[:error] = l(:rate_locked_message)
           @rate.reload # Removes attribute changes
+          @rate.errors.add(:base, l(:rate_locked_message))
         end
         format.html { render action: 'edit' }
-        format.xml  { render xml: @rate.errors, status: :unprocessable_entity }
+        format.api { render_validation_errors(@rate) }
       end
     end
   end
 
   # DELETE /rates/1
   # DELETE /rates/1.xml
+  # DELETE /rates/1.json
   def destroy
     @rate = Rate.find(params[:id])
-    @rate.destroy
+    destroyed = @rate.destroy
 
     respond_to do |format|
       format.html do
@@ -116,7 +119,14 @@ class RatesController < ApplicationController
           redirect_back_or_default rates_url(user_id: @rate.user_id)
         end
       end
-      format.xml { head :ok }
+      format.api do
+        if destroyed
+          render_api_ok
+        else
+          @rate.errors.add(:base, l(:rate_locked_message)) if @rate.errors.empty?
+          render_validation_errors(@rate)
+        end
+      end
     end
   end
 
@@ -132,7 +142,7 @@ class RatesController < ApplicationController
     respond_to do |format|
       flash[:error] = l(:rate_error_user_not_found)
       format.html { redirect_to(home_url) }
-      format.xml  { render xml: 'User not found', status: :not_found }
+      format.api  { render_api_head :not_found }
     end
   end
 
