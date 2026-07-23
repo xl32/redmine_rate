@@ -12,9 +12,12 @@ class Rate < ActiveRecord::Base
   validates :date_in_effect, presence: true
   validates :amount, numericality: true
 
-  before_save :unlocked?
+  # NOTE: since Rails 5 a callback returning +false+ no longer halts the chain;
+  # a locked rate must abort the save/destroy explicitly via +throw :abort+
+  # (see #ensure_unlocked). Required for Redmine 6.1 (Rails 7.2) / 7.0 (Rails 8.0).
+  before_save :ensure_unlocked
   after_save :update_time_entry_cost_cache
-  before_destroy :unlocked?
+  before_destroy :ensure_unlocked
   after_destroy :update_time_entry_cost_cache
 
   scope :history_for_user, (->(user, order) { where(user_id: user.id).order(order).includes(:project) })
@@ -111,7 +114,10 @@ class Rate < ActiveRecord::Base
   end
 
   def self.store_cache_timestamp(cache_name, timestamp)
-    Setting.plugin_redmine_rate = RedmineRate.settings.merge(cache_name => timestamp)
+    # Persist a plain Hash, never ActionController::Parameters: Rails 7.1+ (Redmine
+    # 6.1/7.0) serializes Settings through YAML safe-load, which rejects the
+    # Parameters class and would raise on read.
+    Setting.plugin_redmine_rate = RedmineRate.settings.merge(cache_name => timestamp).to_unsafe_h
   end
 
   def self.with_common_lockfile(force = false, &block)
@@ -129,6 +135,13 @@ class Rate < ActiveRecord::Base
   end
 
   private
+
+  # Halts the save/destroy callback chain when the rate is locked (has time
+  # entries). Kept separate from #unlocked?, which must stay a plain predicate
+  # for controllers and views.
+  def ensure_unlocked
+    throw :abort if locked?
+  end
 
   def update_time_entry_cost_cache
     TimeEntry.update_cost_cache(user, project)

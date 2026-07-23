@@ -2,12 +2,9 @@
 
 The Rate plugin stores billable rates for Users.  It also provides an API that can be used to find the rate for a Member of a Project at a specific date.
 
-{<img src="https://gemnasium.com/badges/github.com/AlphaNodes/redmine_rate.svg" alt="Dependency Status" />}[https://gemnasium.com/github.com/AlphaNodes/redmine_rate]
-{<img src="https://pm.alphanodes.com/jenkins/buildStatus/icon?job=Devel-build-redmine-rate" alt="Jenkins Build Status" />}[https://pm.alphanodes.com/jenkins/buildStatus/icon?job=Devel-build-redmine-rate]
-
 == Requirements
 
-* Redmine version >= 5.0 (Redmine 5.0.x and Redmine 5.1.x are supported)
+* Redmine version >= 5.0 (tested with Redmine 5.0.x/5.1.x on Rails 6.1, 6.0.x/6.1.x on Rails 7.x, and 7.0.x on Rails 8.0)
 
 == Features
 
