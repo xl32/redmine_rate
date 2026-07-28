@@ -1,5 +1,55 @@
 # Changelog
 
+## 2.2.0 — Searchable project combobox
+
+### Added
+
+- **The project drop-down on the rate form is now a type-in combobox** (`New rate`
+  / `Edit rate`, i.e. the user's Rate History tab and `/rates/:id/edit`). Picking
+  a project out of a list of several hundred meant scrolling through the whole
+  `<select>`; the field now lists every project when clicked and narrows down to
+  the projects whose name contains every typed term.
+  - Built on the jQuery UI autocomplete widget that Redmine already bundles and
+    uses for its own autocomplete fields, so no new dependency is introduced and
+    the field picks up core's `input.autocomplete` / `.ui-autocomplete` styling
+    (search icon, menu, keyboard navigation, `autoFocus` so `Enter` takes the
+    first match).
+  - `assets/javascripts/rate_project_combobox.js` hides the `<select>` and
+    inserts the text field next to it. The select remains in the DOM and is
+    still what gets submitted, so nothing changes server side and the form keeps
+    working without JavaScript (or without jQuery UI, which the script checks
+    for). Typed text that matches no project is reverted to the current
+    selection rather than silently changing the rate.
+  - Menu entries keep the project tree prefix (`» Child`), the field itself shows
+    the plain project name; the prefix and non-breaking spaces are ignored when
+    matching. Non-selectable parent projects are left out of the results.
+  - Included via `javascript_include_tag ... plugin: 'redmine_rate'` from the
+    form partial (not `:header_tags`), so it also arrives when the partial is
+    rendered from an xhr response, and the widget is (re)built on
+    `ajaxComplete`.
+- Tests: `GET new` asserts the combobox hook markup (`span.rate-project-picker`
+  with the localized `data-search-label`, the unchanged project select) and the
+  script tag; `GET edit` additionally asserts the pre-selected project.
+  - The widget itself is covered by `test/javascript/rate_project_combobox_test.js`,
+    which drives it in jsdom against the surrounding Redmine's own jQuery UI
+    bundle (build, focus-to-list-all, filtering, tree-prefix/case-insensitive
+    matching, picking an entry, non-matching text left alone, default rate).
+    It is not wired into rake — it needs node and jsdom — so run it by hand:
+    `npm install jsdom && node test/javascript/rate_project_combobox_test.js`.
+    It found one real bug: passing `autocomplete: 'off'` to `$('<input>', {...})`
+    dispatches to jQuery UI's `autocomplete` *method* and threw before the field
+    was inserted; attributes are set through `.attr` now.
+
+### Changed
+
+- The project list for the drop-down moved out of the form partial into a new
+  `RedmineRate::Helpers#rate_project_options`, dropping the stale
+  "TODO: move to controller once a hook is in place for the Admin panel". A
+  controller was never the right home: the partial is rendered both by
+  `RatesController#new/#edit` and by the Rate History tab, which core's
+  `UsersController` serves — so no hook would have helped.
+- Bumped plugin version to `2.2.0`.
+
 ## 2.1.0 — Disable rate lock
 
 ### Added

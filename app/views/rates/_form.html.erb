@@ -12,11 +12,14 @@
         <%= f.text_field "date_in_effect", :size => 10  %><%= calendar_for('rate_date_in_effect') %>
       </td>
       <td>
-        <%= # TODO: move to controller once a hook is in place for the Admin panel
-          projects = Project.where(status: Project::STATUS_ACTIVE)
-
-          select_tag('rate[project_id]', project_options_for_select_with_selected(projects, @rate.project))
-        %>
+        <%# rate_project_combobox.js turns the drop-down into a type-in field and
+            hides it; the select stays the submitted value, so the form keeps
+            working without JavaScript. %>
+        <span class="rate-project-picker" data-search-label="<%= l(:rate_label_search_projects) %>">
+          <%= select_tag('rate[project_id]',
+                         rate_project_options(@rate.project),
+                         class: 'rate-project-select') %>
+        </span>
       </td>
       <td align="right">
         <%= f.text_field "amount", size: 10  %> <%=  currency_name(true) %>
@@ -34,3 +37,7 @@
 	</tbody>
 </table>
 <% end %>
+
+<%# Loaded here rather than through :header_tags so it also arrives when the
+    form is rendered from an xhr response (see rates/index.js.erb). %>
+<%= javascript_include_tag 'rate_project_combobox', plugin: 'redmine_rate' %>

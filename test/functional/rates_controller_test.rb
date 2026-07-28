@@ -204,6 +204,19 @@ class RatesControllerTest < ActionController::TestCase
         assert assigns(:rate)
         assert assigns(:rate).new_record?
       end
+
+      should 'should render the project drop-down as a searchable combobox' do
+        get :new, params: { user_id: @user.id }
+
+        # The select is still what gets submitted; the combobox is built on top
+        # of it client side, so only the hook markup is asserted here.
+        assert_select 'span.rate-project-picker[data-search-label=?]',
+                      I18n.t(:rate_label_search_projects) do
+          assert_select "select.rate-project-select[name='rate[project_id]']", count: 1
+        end
+        # Propshaft digests asset filenames, so match on the stem.
+        assert_select "script[src*='rate_project_combobox']"
+      end
     end
 
     context 'responding to GET edit' do
@@ -214,6 +227,14 @@ class RatesControllerTest < ActionController::TestCase
       should 'should expose the requested rate as @rate' do
         get :edit, params: { id: @mock_rate.id }
         assert_equal assigns(:rate), @mock_rate
+      end
+
+      should 'should render the project drop-down as a searchable combobox' do
+        get :edit, params: { id: @mock_rate.id }
+
+        assert_select 'span.rate-project-picker select.rate-project-select', count: 1
+        assert_select "select[name='rate[project_id]'] option[value=?][selected=selected]",
+                      @mock_rate.project_id.to_s
       end
 
       context 'on a locked rate' do

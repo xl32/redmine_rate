@@ -20,6 +20,7 @@ de:
   rate_label_edit_rate: Stundensatz bearbeiten
   rate_label_new_rate: Neuer Stundensatz
   rate_label_rate_history: Stundensatzverlauf
+  rate_label_search_projects: Projekte suchen
   rate_label_set_rate: Stundensatz setzen
   rate_locked_message:  Der Stundensatz ist gesperrt und kann nicht bearbeitet werden.
   rate_updated_message: Der Stundensatz wurde erfolgreich aktualisiert.

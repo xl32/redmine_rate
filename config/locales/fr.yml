@@ -20,6 +20,7 @@ fr:
   rate_label_edit_rate: Edit rate
   rate_label_new_rate: "Nouveau tarif"
   rate_label_rate_history: Historique du tarif
+  rate_label_search_projects: Rechercher un projet
   rate_label_set_rate: "Définir le tarif"
   rate_locked_message:  Rate is locked and cannot be edited
   rate_updated_message: Rate was successfully updated.

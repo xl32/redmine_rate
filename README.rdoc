@@ -18,6 +18,8 @@ to query stored rates.
 * Lock rates to preserve historic calculations (a rate becomes locked once a
   time entry references it); the lock can be disabled in the plugin settings to
   correct rates after the fact
+* Searchable project combobox on the rate form, for installations with many
+  projects
 * +Rate.for+ Ruby API for other plugins
 * Read-only REST API (XML/JSON) to query rates
 * Flag time entries as billable (with bulk support)
@@ -75,6 +77,13 @@ in the administration panel:
 3. Select the user
 4. Select the Rate History tab and enter a new rate, leaving the Project field
    set to "Default Rate"
+
+The Project field on the "New rate" and "Edit rate" forms is a searchable
+combobox: click it to see every project, or type part of a project name to narrow
+the list down (every entered term has to appear in the name). Arrow keys and
++Enter+ pick an entry, +Esc+ closes the list. It is built on the jQuery UI
+autocomplete widget bundled with Redmine, and degrades to the plain drop-down
+when JavaScript is unavailable.
 
 === Lock a rate
 

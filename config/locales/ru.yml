@@ -20,6 +20,7 @@ ru:
   rate_label_edit_rate: Изменить ставку
   rate_label_new_rate: Новая ставка
   rate_label_rate_history: История ставок
+  rate_label_search_projects: Поиск проекта
   rate_label_set_rate: Установить ставку
   rate_locked_message:  Часовая ставка заблокирована и не может быть изменена
   rate_updated_message: Rate was successfully updated.

@@ -74,6 +74,16 @@ module RedmineRate
               class: css)
     end
 
+    # Options for the project drop-down on the rate form, +selected+ being the
+    # rate's current project (nil for a default rate).
+    #
+    # This lives in a helper rather than in a controller because the form partial
+    # is rendered from two places: RatesController#new/#edit and the Rate History
+    # tab, which is served by Redmine's own UsersController.
+    def rate_project_options(selected = nil)
+      project_options_for_select_with_selected(Project.where(status: Project::STATUS_ACTIVE), selected)
+    end
+
     def currency_codes_for_select
       currencies = []
       Money::Currency.table.values.each do |currency|
