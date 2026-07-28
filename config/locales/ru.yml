@@ -1,12 +1,14 @@
 ru:
   billable_default_info: If active, all time log entries will be activated as "billable". In case the user has not the right to activate "billable" all time log entries will be automatically selected as "billable".
+  disable_rate_lock_info: Если включено, часовые ставки, на которые уже ссылаются трудозатраты, можно редактировать и удалять. Сохранённая стоимость затронутых трудозатрат пересчитывается.
   field_billable: Billable
   field_cost: Cost
   label_rate_cost: Cost
   label_billable_default: Default billable
+  label_disable_rate_lock: Отключить блокировку часовых ставок
   label_rate_caches: "Rate Caches"
-  label_rate_plural: Платежи
-  label_rate: Платеж
+  label_rate_plural: Часовые ставки
+  label_rate: Часовая ставка
   label_total_cost: Costs with subtasks
   permission_activate_billable: Activate billable
   permission_view_rate: Show rate
@@ -14,12 +16,12 @@ ru:
   rate_error_creating_new_rate: Error creating a new rate.
   rate_error_user_not_found: Пользователь не найден
   rate_label_currency: Currency
-  rate_label_default: Платеж по умолчанию
-  rate_label_edit_rate: Edit rate
-  rate_label_new_rate: Новый платежe
-  rate_label_rate_history: История платежей
-  rate_label_set_rate: Установить платеж
-  rate_locked_message:  Rate is locked and cannot be edited
+  rate_label_default: Ставка по умолчанию
+  rate_label_edit_rate: Изменить ставку
+  rate_label_new_rate: Новая ставка
+  rate_label_rate_history: История ставок
+  rate_label_set_rate: Установить ставку
+  rate_locked_message:  Часовая ставка заблокирована и не может быть изменена
   rate_updated_message: Rate was successfully updated.
   text_caches_loaded_successfully: "Caches chargés avec succés"
   text_clear_and_load_all_caches: "Recharger tous les caches"

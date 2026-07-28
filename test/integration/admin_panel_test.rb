@@ -17,6 +17,15 @@ class AdminPanelTest < RedmineRateIntegrationTest
     logout
   end
 
+  context 'Rate settings admin panel' do
+    should 'have a checkbox to disable the rate lock' do
+      visit('/settings/plugin/redmine_rate')
+
+      assert_text l(:label_disable_rate_lock)
+      assert_selector 'input[type=checkbox][name="settings[disable_rate_lock]"]'
+    end
+  end
+
   context 'Rate Caches admin panel' do
     should 'show the last run timestamp for the last caching run' do
       visit('/settings/plugin/redmine_rate?tab=caches')

@@ -45,6 +45,17 @@ end
 
 class ActiveSupport::TestCase
   fixtures :users, :issues, :projects, :time_entries
+
+  # Runs the block with the plugin's rate lock turned off (the
+  # "Disable rate lock" setting in Administration -> Plugins -> Rate),
+  # restoring the previous plugin settings afterwards.
+  def with_rate_lock_disabled
+    previous = Setting.plugin_redmine_rate
+    Setting.plugin_redmine_rate = previous.merge('disable_rate_lock' => '1')
+    yield
+  ensure
+    Setting.plugin_redmine_rate = previous
+  end
 end
 
 class RedmineRateIntegrationTest < Redmine::IntegrationTest

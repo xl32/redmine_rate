@@ -1,9 +1,11 @@
 fr:
   billable_default_info: If active, all time log entries will be activated as "billable". In case the user has not the right to activate "billable" all time log entries will be automatically selected as "billable".
+  disable_rate_lock_info: "Si actif, les tarifs auxquels des temps passés sont déjà associés peuvent toujours être modifiés et supprimés. Les coûts enregistrés des temps passés concernés sont recalculés."
   field_billable: Billable
   field_cost: "Coût"
   label_rate_cost: "Coût"
   label_billable_default: Default billable
+  label_disable_rate_lock: "Désactiver le verrouillage des tarifs"
   label_rate_caches: "Caches des tarifs"
   label_rate_plural: Tarifs
   label_rate: Tarif

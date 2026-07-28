@@ -14,7 +14,8 @@ Redmine::Plugin.register :redmine_rate do
   default_settings = {
     last_caching_run: nil,
     billable_default: 1,
-    currency: 'EUR'
+    currency: 'EUR',
+    disable_rate_lock: 0
   }
 
   project_module :time_tracking do

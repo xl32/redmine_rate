@@ -29,7 +29,7 @@
       </td>
       <td align="right"><%= h show_number_with_currency(rate.amount) %></td>
       <td align="center">
-        <% if rate.unlocked? %>
+        <% if rate.editable? %>
         <%= link_to image_tag('edit.png'), edit_rate_path(rate, back_url: @back_url) %>
         <%= link_to image_tag('delete.png'), rate_path(rate, back_url: @back_url), data: { confirm: l(:text_are_you_sure) }, method: :delete %>
         <% else %>

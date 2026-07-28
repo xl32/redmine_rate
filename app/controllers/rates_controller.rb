@@ -86,13 +86,14 @@ class RatesController < ApplicationController
     @rate = Rate.find(params[:id])
 
     respond_to do |format|
-      # Locked rates will fail saving here (before_save aborts the callback chain).
+      # Locked rates will fail saving here (before_save aborts the callback chain),
+      # unless the lock has been disabled in the plugin settings.
       if @rate.update rate_params
         flash[:notice] = l(:rate_updated_message)
         format.html { redirect_back_or_default(rates_url(user_id: @rate.user_id)) }
         format.api { render_api_ok }
       else
-        if @rate.locked?
+        unless @rate.editable?
           flash[:error] = l(:rate_locked_message)
           @rate.reload # Removes attribute changes
           @rate.errors.add(:base, l(:rate_locked_message))
@@ -112,11 +113,11 @@ class RatesController < ApplicationController
 
     respond_to do |format|
       format.html do
-        if @rate.locked?
-          flash[:error] = 'Rate is locked and cannot be deleted'
-        else
+        if destroyed
           flash[:notice] = 'Rate was deleted.'
           redirect_back_or_default rates_url(user_id: @rate.user_id)
+        else
+          flash[:error] = 'Rate is locked and cannot be deleted'
         end
       end
       format.api do

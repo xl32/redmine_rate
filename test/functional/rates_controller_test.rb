@@ -165,6 +165,7 @@ class RatesControllerTest < ActionController::TestCase
             assert_select 'id', text: @mock_rate.id.to_s
             assert_select 'amount', text: /100/
             assert_select 'locked', text: 'false'
+            assert_select 'editable', text: 'true'
           end
         end
 
@@ -229,6 +230,12 @@ class RatesControllerTest < ActionController::TestCase
           get :edit, params: { id: @mock_rate.id }
           # Propshaft digests asset filenames (locked-<digest>.png), so match on the stem.
           assert_select "img[src*='locked']"
+        end
+
+        should 'should have an Update button when the lock is disabled in the settings' do
+          with_rate_lock_disabled { get :edit, params: { id: @mock_rate.id } }
+
+          assert_select 'input[type=submit]', count: 1
         end
       end
     end
@@ -358,6 +365,15 @@ class RatesControllerTest < ActionController::TestCase
 
           assert_match(/locked/, flash[:error])
         end
+
+        should 'should save the rate when the lock is disabled in the settings' do
+          with_rate_lock_disabled do
+            put :update, params: { id: @mock_rate.id, rate: { amount: 150 } }
+          end
+
+          assert_equal 150, @mock_rate.reload.amount
+          assert_redirected_to rates_url(user_id: @user.id)
+        end
       end
     end
 
@@ -392,6 +408,14 @@ class RatesControllerTest < ActionController::TestCase
         should 'should display an error message' do
           delete :destroy, params: { id: @mock_rate.id }
           assert_match(/locked/, flash[:error])
+        end
+
+        should 'should destroy the rate when the lock is disabled in the settings' do
+          assert_difference('Rate.count', -1) do
+            with_rate_lock_disabled { delete :destroy, params: { id: @mock_rate.id } }
+          end
+
+          assert_redirected_to rates_url(user_id: @user.id)
         end
       end
     end
@@ -443,6 +467,18 @@ class RatesControllerTest < ActionController::TestCase
 
         assert_response 422
         assert_equal 100.0, rate.reload.amount
+      end
+
+      should 'update a locked rate when the lock is disabled in the settings' do
+        rate = mock_locked_rate
+        with_settings rest_api_enabled: '1' do
+          with_rate_lock_disabled do
+            put :update, params: { key: @user.api_key, id: rate.id, rate: { amount: '175' } }, format: 'json'
+          end
+        end
+
+        assert_response :no_content
+        assert_equal 175.0, rate.reload.amount
       end
 
       should 'delete a rate and return 204' do

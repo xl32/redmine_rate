@@ -12,3 +12,10 @@
   <%= check_box_tag 'settings[billable_default]', 1, @settings[:billable_default].to_i  == 1 %>
   <em class="info"><%= l(:billable_default_info) %></em>
 </p>
+
+<p>
+  <%= label_tag 'settings[disable_rate_lock]', l(:label_disable_rate_lock) %>
+  <%= hidden_field_tag 'settings[disable_rate_lock]', 0, id: nil %>
+  <%= check_box_tag 'settings[disable_rate_lock]', 1, @settings[:disable_rate_lock].to_i == 1 %>
+  <em class="info"><%= l(:disable_rate_lock_info) %></em>
+</p>

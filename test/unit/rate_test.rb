@@ -48,6 +48,73 @@ class RateTest < ActiveSupport::TestCase
     end
   end
 
+  context '#editable?' do
+    should 'should be true if no Time Entries are associated' do
+      assert Rate.new.editable?
+    end
+
+    should 'should be false if a Time Entry is associated' do
+      rate = Rate.new
+      rate.time_entries << TimeEntry.generate!
+      assert !rate.editable?
+    end
+
+    should 'should be true for a locked Rate when the lock is disabled in the settings' do
+      rate = Rate.new
+      rate.time_entries << TimeEntry.generate!
+
+      with_rate_lock_disabled do
+        assert rate.editable?
+      end
+    end
+  end
+
+  context 'with the rate lock disabled' do
+    setup do
+      @user = User.generate!
+      @project = Project.generate!
+      @date = Time.zone.today.to_s
+      @rate = Rate.generate!(user: @user, project: @project, date_in_effect: @date, amount: 200.0)
+      @time_entry = TimeEntry.generate!(user: @user,
+                                        project: @project,
+                                        spent_on: @date,
+                                        hours: 10.0,
+                                        activity: TimeEntryActivity.generate!)
+      # Assigning the Time Entry sets its rate_id, which is what locks the Rate
+      @rate.time_entries << @time_entry
+    end
+
+    should 'should save a locked Rate' do
+      assert @rate.locked?
+
+      with_rate_lock_disabled do
+        @rate.amount = 150.0
+        assert @rate.save
+      end
+
+      assert_equal 150.0, @rate.reload.amount
+    end
+
+    should 'should keep the Time Entries on the Rate and refresh their cached cost' do
+      assert_equal 2000.0, @time_entry.reload.cost.to_f
+      assert_equal @rate.id, @time_entry.rate_id
+
+      with_rate_lock_disabled do
+        assert @rate.update(amount: 150.0)
+      end
+
+      @time_entry.reload
+      assert_equal @rate.id, @time_entry.rate_id
+      assert_equal 1500.0, @time_entry.cost.to_f
+    end
+
+    should 'should destroy a locked Rate' do
+      assert_difference('Rate.count', -1) do
+        with_rate_lock_disabled { @rate.destroy }
+      end
+    end
+  end
+
   context '#save' do
     should 'should save if a Rate is unlocked' do
       rate = Rate.new(rate_valid_attributes)

@@ -1,9 +1,11 @@
 en:
   billable_default_info: If active, all time log entries will be activated as "billable". In case the user has not the right to activate "billable" all time log entries will be automatically selected as "billable".
+  disable_rate_lock_info: If active, rates that already have time entries can still be edited and deleted. The cached costs of the affected time entries are recalculated.
   field_billable: Billable
   field_cost: Cost
   label_rate_cost: Cost
   label_billable_default: Default billable
+  label_disable_rate_lock: Disable rate lock
   label_rate_caches: "Rate caches"
   label_rate_plural: Rates
   label_rate: Rate

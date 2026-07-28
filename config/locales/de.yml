@@ -1,9 +1,11 @@
 de:
   billable_default_info: Wenn aktiv, werden alle Aufwandsbuchungen immer als "Berechenbar" aktiviert. Besitzt der Benutzer nicht die Berechtigung "Berechenbar" zu aktivieren, dann werden bei diesen Benutzer alle Aufwandsbuchungen als "Berechenbar" markiert.
+  disable_rate_lock_info: Wenn aktiv, können Stundensätze, denen bereits Aufwandsbuchungen zugeordnet sind, weiterhin bearbeitet und gelöscht werden. Die gespeicherten Kosten der betroffenen Aufwandsbuchungen werden neu berechnet.
   field_billable: Fakturierbar
   field_cost: Kosten
   label_rate_cost: Kosten
   label_billable_default: Standard Fakturierbar
+  label_disable_rate_lock: Stundensatz-Sperre deaktivieren
   label_rate_caches: "Stundensatz-Cache"
   label_rate_plural: Stundensätze
   label_rate: Stundensatz

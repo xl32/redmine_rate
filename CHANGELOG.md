@@ -1,5 +1,39 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **"Disable rate lock" plugin setting** (Administration -> Plugins -> Rate ->
+  Configure, default off). With it checked, rates that already have time entries
+  can be edited and deleted again — in the Rate History UI and through the REST
+  API — so a rate entered incorrectly can be fixed instead of being frozen
+  forever.
+  - `Rate.lock_enforced?` reads the setting; the new `Rate#editable?` predicate
+    (`unlocked? || !Rate.lock_enforced?`) drives the `before_save`/`before_destroy`
+    guard, the edit/delete controls in `rates/_form` and `rates/_list`, and the
+    lock error in `RatesController#update`. `locked?`/`unlocked?` keep their
+    original meaning ("has time entries"), so the API's `locked` field is
+    unchanged.
+  - Editing a locked rate leaves its time entries assigned to it (`rate_id` is
+    untouched); the existing `after_save` hook just recomputes their cached cost,
+    so correcting an amount also corrects the costs already booked against it.
+  - `RatesController#destroy` now branches on the return value of `destroy`
+    instead of `locked?`, which stays true after a successful destroy of a rate
+    that had time entries.
+  - The REST API additionally exposes `editable` per rate, since `locked` alone
+    no longer implies "cannot be written".
+- Tests: model coverage for `#editable?` plus save/destroy/cost-refresh with the
+  lock disabled, controller coverage for update/destroy/edit-button (HTML and
+  API) and an admin-panel test for the new checkbox. `with_rate_lock_disabled`
+  lives in `test/test_helper.rb`.
+
+### Changed
+
+- Russian locale: rates were translated as "платежи" (payments); corrected to
+  "часовые ставки", and the previously untranslated `rate_locked_message` /
+  `rate_label_edit_rate` are now translated.
+
 ## 2.0.0 — REST API
 
 ### Added

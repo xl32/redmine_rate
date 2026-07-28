@@ -15,6 +15,9 @@ class Rate < ActiveRecord::Base
   # NOTE: since Rails 5 a callback returning +false+ no longer halts the chain;
   # a locked rate must abort the save/destroy explicitly via +throw :abort+
   # (see #ensure_unlocked). Required for Redmine 6.1 (Rails 7.2) / 7.0 (Rails 8.0).
+  # Editing a locked rate stays possible when the lock is disabled in the plugin
+  # settings; the associated time entries keep their rate_id and only have their
+  # cached cost recomputed (see #update_time_entry_cost_cache).
   before_save :ensure_unlocked
   after_save :update_time_entry_cost_cache
   before_destroy :ensure_unlocked
@@ -22,12 +25,24 @@ class Rate < ActiveRecord::Base
 
   scope :history_for_user, (->(user, order) { where(user_id: user.id).order(order).includes(:project) })
 
+  # Whether locked rates are protected from changes. Admins can turn the lock
+  # off in the plugin settings (Administration -> Plugins -> Rate).
+  def self.lock_enforced?
+    !RedmineRate.setting?(:disable_rate_lock)
+  end
+
   def locked?
     !time_entries.empty?
   end
 
   def unlocked?
     !locked?
+  end
+
+  # Whether the rate may still be edited or deleted: either it has no time
+  # entries yet, or the lock has been disabled in the plugin settings.
+  def editable?
+    unlocked? || !Rate.lock_enforced?
   end
 
   def default?
@@ -140,7 +155,7 @@ class Rate < ActiveRecord::Base
   # entries). Kept separate from #unlocked?, which must stay a plain predicate
   # for controllers and views.
   def ensure_unlocked
-    throw :abort if locked?
+    throw :abort unless editable?
   end
 
   def update_time_entry_cost_cache

@@ -16,7 +16,8 @@ to query stored rates.
   * the project
 * Store historic rate amounts
 * Lock rates to preserve historic calculations (a rate becomes locked once a
-  time entry references it)
+  time entry references it); the lock can be disabled in the plugin settings to
+  correct rates after the fact
 * +Rate.for+ Ruby API for other plugins
 * Read-only REST API (XML/JSON) to query rates
 * Flag time entries as billable (with bulk support)
@@ -81,6 +82,13 @@ A rate becomes locked automatically once a valid time entry is assigned to it.
 Locked rates can no longer be edited or deleted, which preserves the correctness
 of historic cost calculations.
 
+The lock can be turned off under Administration -> Plugins -> Rate ->
+Configure by checking "Disable rate lock". Locked rates are then editable and
+deletable like any other rate, in the web UI as well as through the REST API,
+which is what you want when a rate was entered incorrectly. The time entries
+stay assigned to the rate; only their cached cost is recalculated, so correcting
+a rate amount also corrects the costs already booked against it.
+
 === Caching
 
 The plugin caches the total cost of each time entry in the database instead of
@@ -130,6 +138,7 @@ The +user_id+ parameter is required; an unknown user returns 404.
         "amount": "100.0",
         "date_in_effect": "2026-01-01",
         "locked": false,
+        "editable": true,
         "user": { "id": 42, "name": "Jane Doe" },
         "project": { "id": 3, "name": "Website" }
       }
@@ -137,7 +146,9 @@ The +user_id+ parameter is required; an unknown user returns 404.
   }
 
 A rate without a +project+ element is the user's default rate. +locked+ is true
-when the rate already has time entries and can no longer be changed.
+when the rate already has time entries. +editable+ tells whether the rate still
+accepts writes: it is false only for a locked rate while the rate lock is
+enabled (see "Lock a rate" above).
 
 === Show a single rate
 
@@ -153,6 +164,7 @@ when the rate already has time entries and can no longer be changed.
     <amount>100.0</amount>
     <date_in_effect>2026-01-01</date_in_effect>
     <locked>false</locked>
+    <editable>true</editable>
     <user id="42" name="Jane Doe"/>
     <project id="3" name="Website"/>
   </rate>
@@ -177,7 +189,8 @@ errors.
   PUT /rates/:id.xml
 
 Returns 204 No Content on success, or 422 with errors. A locked rate (one that
-already has time entries) cannot be changed and returns 422.
+already has time entries) cannot be changed and returns 422, unless "Disable
+rate lock" is checked in the plugin settings.
 
   curl -X PUT -H "X-Redmine-API-Key: <admin_api_key>" \
        -H "Content-Type: application/json" \
@@ -190,7 +203,7 @@ already has time entries) cannot be changed and returns 422.
   DELETE /rates/:id.xml
 
 Returns 204 No Content on success. A locked rate cannot be deleted and returns
-422.
+422, unless "Disable rate lock" is checked in the plugin settings.
 
   curl -X DELETE -H "X-Redmine-API-Key: <admin_api_key>" \
        "https://redmine.example.com/rates/7.json"
