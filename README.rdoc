@@ -78,6 +78,9 @@ in the administration panel:
 4. Select the Rate History tab and enter a new rate, leaving the Project field
    set to "Default Rate"
 
+The Date field uses the browser's own date picker and starts out on today's date
+for a new rate.
+
 The Project field on the "New rate" and "Edit rate" forms is a searchable
 combobox: click it to see every project, or type part of a project name to narrow
 the list down (every entered term has to appear in the name). Arrow keys and

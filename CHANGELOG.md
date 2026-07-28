@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.2.1 — Date picker on the rate form
+
+### Fixed
+
+- **The Date field on the rate form had no date picker at all.** It was rendered
+  with `f.text_field` plus `calendar_for`, but core's `datepickerFallback` only
+  attaches the jQuery UI picker when the browser has *no* native date input —
+  which every current browser has — so the field stayed a plain text box and the
+  date had to be typed by hand. It now uses `f.date_field`, the same helper
+  core's own date fields use (`timelog/_form.html.erb`), giving the browser's
+  date picker. The `calendar_for` fallback was dropped rather than kept
+  alongside it.
+- The date now defaults to today on the "New rate" form instead of being empty.
+  Only the form defaults: `Rate` still requires `date_in_effect`, so the REST
+  API keeps rejecting a rate without a date instead of silently dating it today.
+
+### Changed
+
+- Bumped plugin version to `2.2.1`.
+
 ## 2.2.0 — Searchable project combobox
 
 ### Added

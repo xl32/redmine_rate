@@ -205,6 +205,13 @@ class RatesControllerTest < ActionController::TestCase
         assert assigns(:rate).new_record?
       end
 
+      should "should offer a date picker defaulting to today's date" do
+        get :new, params: { user_id: @user.id }
+
+        assert_select "input[type=date][name='rate[date_in_effect]'][value=?]",
+                      User.current.today.strftime('%Y-%m-%d')
+      end
+
       should 'should render the project drop-down as a searchable combobox' do
         get :new, params: { user_id: @user.id }
 
@@ -227,6 +234,13 @@ class RatesControllerTest < ActionController::TestCase
       should 'should expose the requested rate as @rate' do
         get :edit, params: { id: @mock_rate.id }
         assert_equal assigns(:rate), @mock_rate
+      end
+
+      should "should keep the rate's own date in the date picker" do
+        get :edit, params: { id: @mock_rate.id }
+
+        assert_select "input[type=date][name='rate[date_in_effect]'][value=?]",
+                      @mock_rate.date_in_effect.strftime('%Y-%m-%d')
       end
 
       should 'should render the project drop-down as a searchable combobox' do

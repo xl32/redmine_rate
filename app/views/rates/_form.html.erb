@@ -9,7 +9,12 @@
 	<tbody>
 	<tr class="odd">
       <td>
-        <%= f.text_field "date_in_effect", :size => 10  %><%= calendar_for('rate_date_in_effect') %>
+        <%# date_field renders <input type="date">, which gives the browser's own
+            date picker. A new rate starts out on today's date. %>
+        <% date_in_effect = @rate.date_in_effect || User.current.today %>
+        <%= f.date_field 'date_in_effect',
+                         size: 10,
+                         value: date_in_effect.strftime('%Y-%m-%d') %>
       </td>
       <td>
         <%# rate_project_combobox.js turns the drop-down into a type-in field and
