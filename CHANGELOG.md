@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.1.0 — Disable rate lock
 
 ### Added
 
@@ -33,6 +33,7 @@
 - Russian locale: rates were translated as "платежи" (payments); corrected to
   "часовые ставки", and the previously untranslated `rate_locked_message` /
   `rate_label_edit_rate` are now translated.
+- Bumped plugin version to `2.1.0`.
 
 ## 2.0.0 — REST API
 
