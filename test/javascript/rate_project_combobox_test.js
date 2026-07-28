@@ -107,6 +107,14 @@ async function main() {
   const $input = $(input);
   const menuItems = () => $input.autocomplete('widget').find('li').map((_i, li) => $(li).text()).get();
 
+  // Regression guard: capping the menu from the "open" callback happens after
+  // jQuery UI positioned it, so the first open measured the full list and
+  // flipped the menu above the field, sometimes out of view.
+  console.log('menu height capped before the first open');
+  const menuStyle = $input.autocomplete('widget')[0].style;
+  check('max-height set at build time', menuStyle.maxHeight !== '', JSON.stringify(menuStyle.maxHeight));
+  check('menu scrolls instead of growing', menuStyle.overflowY === 'auto', JSON.stringify(menuStyle.overflowY));
+
   console.log('focusing lists every project');
   $input.trigger('focus');
   check('field cleared so typing filters instead of appending',

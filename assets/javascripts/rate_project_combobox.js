@@ -90,10 +90,19 @@
       source: function (request, response) { response(optionsMatching(select, request.term)); },
       select: function (event, ui) {
         $select.val(ui.item.option.value).trigger('change');
-      },
-      open: function () {
-        $input.autocomplete('widget').css({ maxHeight: MENU_MAX_HEIGHT, overflowY: 'auto' });
       }
+    });
+
+    // The height has to be capped here, before the menu is ever positioned, and
+    // not from the "open" callback: that one runs *after* jQuery UI has placed
+    // the menu, so on the first open it measured the full list (hundreds of
+    // projects, thousands of pixels), found no room below the field and flipped
+    // the menu above it -- occasionally out of view. Every later open then
+    // behaved because the cap from the first one was still on the element.
+    $input.autocomplete('widget').css({
+      maxHeight: MENU_MAX_HEIGHT,
+      overflowY: 'auto',
+      overflowX: 'hidden'
     });
 
     // While focused the field is a search box: it starts out empty and lists

@@ -1,5 +1,31 @@
 # Changelog
 
+## 2.2.2 — Project combobox opened upwards on the first click
+
+### Fixed
+
+- **The project list flipped above the field on the first open after every page
+  load**, sometimes landing outside the visible area so the list could not be
+  used without clicking away and back. Every subsequent open was correct, which
+  is what made it look erratic.
+  - Cause: the menu's height cap was applied from the widget's `open` callback,
+    which runs *after* jQuery UI has positioned the menu. On the first open the
+    menu therefore still measured the full list — hundreds of projects, thousands
+    of pixels — so `collision: 'flipfit'` found no room below the field and
+    flipped it above. Later opens behaved because the cap from the first open was
+    still on the element.
+  - `max-height` / `overflow` are now set on the menu at build time, before it
+    can ever be positioned, so the very first open measures the capped 20em and
+    drops below the field. A guard in `test/javascript/rate_project_combobox_test.js`
+    asserts the cap is present before the first open.
+  - Note that a field sitting at the very bottom of the viewport still opens
+    upwards; that is jQuery UI's `flipfit` doing the right thing, and the list
+    stays on screen either way.
+
+### Changed
+
+- Bumped plugin version to `2.2.2`.
+
 ## 2.2.1 — Date picker on the rate form
 
 ### Fixed
