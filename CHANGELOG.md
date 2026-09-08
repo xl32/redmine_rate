@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.3.0 — Optional user_id, project_id filter and pagination on the rates API
+
+### Added
+
+- **`GET /rates` no longer requires `user_id`.** Omitting it lists rates for
+  all users; the HTML/JS rate history view is unchanged and still requires it.
+- **A `project_id` query parameter filters the list to that project's rates**
+  (exact match — a user's project-less default rate is not included). An
+  unknown `project_id` returns `404`.
+- **Standard Redmine REST API pagination**: `offset`/`limit`/`page` are
+  accepted and `total_count`/`offset`/`limit` are returned, per the
+  [collection resources convention](https://www.redmine.org/projects/redmine/wiki/rest_api#Collection-resources-and-pagination).
+  Default page size is 25, capped at 100, matching every other Redmine API
+  index endpoint.
+
+### Changed
+
+- Bumped plugin version to `2.3.0`.
+
 ## 2.2.2 — Project combobox opened upwards on the first click
 
 ### Fixed

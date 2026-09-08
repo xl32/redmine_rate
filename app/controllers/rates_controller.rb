@@ -4,7 +4,9 @@ class RatesController < ApplicationController
   include SortHelper
 
   before_action :require_admin
-  before_action :require_user_id, only: %i[index new]
+  before_action :require_user_id, :only => [:new]
+  before_action :find_index_user, :only => [:index]
+  before_action :find_index_project, :only => [:index]
   before_action :set_back_url
 
   # REST API: allows API key / basic auth. All actions require admin
@@ -17,17 +19,22 @@ class RatesController < ApplicationController
   }.freeze
 
   # GET /rates?user_id=1
-  # GET /rates.xml?user_id=1
-  # GET /rates.json?user_id=1
+  # GET /rates.xml?user_id=1&project_id=1&offset=0&limit=25
+  # GET /rates.json?user_id=1&project_id=1&offset=0&limit=25
   def index
     sort_init "#{Rate.table_name}.date_in_effect", 'desc'
     sort_update VALID_SORT_OPTIONS
 
-    @rates = Rate.history_for_user(@user, sort_clause)
+    scope = Rate.history(sort_clause, user: @user, project: @project)
+    @rates = scope
 
     respond_to do |format|
       format.html { render action: 'index', layout: !request.xhr? }
-      format.api  # index.api.rsb
+      format.api do
+        @rate_count = scope.count
+        @offset, @limit = api_offset_and_limit
+        @rates = scope.limit(@limit).offset(@offset).to_a
+      end
       format.js
     end
   end
@@ -145,6 +152,18 @@ class RatesController < ApplicationController
       format.html { redirect_to(home_url) }
       format.api  { render_api_head :not_found }
     end
+  end
+
+  # user_id is optional for the API only; the HTML/JS rate history still
+  # needs a user to build its sort headers (see rates/_list.html.erb).
+  def find_index_user
+    require_user_id unless api_request? && params[:user_id].blank?
+  end
+
+  def find_index_project
+    @project = Project.find(params[:project_id]) if params[:project_id].present?
+  rescue ActiveRecord::RecordNotFound
+    render_404
   end
 
   def set_back_url

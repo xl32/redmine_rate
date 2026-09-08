@@ -25,6 +25,13 @@ class Rate < ActiveRecord::Base
 
   scope :history_for_user, (->(user, order) { where(user_id: user.id).order(order).includes(:project) })
 
+  def self.history(sort_clause, user: nil, project: nil)
+    scope = order(sort_clause).includes(:project).references(:project)
+    scope = scope.where(user_id: user.id) if user
+    scope = scope.where(project_id: project.id) if project
+    scope
+  end
+
   # Whether locked rates are protected from changes. Admins can turn the lock
   # off in the plugin settings (Administration -> Plugins -> Rate).
   def self.lock_enforced?
