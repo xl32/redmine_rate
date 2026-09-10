@@ -67,6 +67,33 @@ class RateTest < ActiveSupport::TestCase
         assert rate.editable?
       end
     end
+
+    should 'should be false for a deleted Rate' do
+      rate = Rate.create!(rate_valid_attributes)
+      assert rate.soft_delete
+      assert !rate.editable?
+    end
+
+    should 'should be false for a deleted Rate even when the lock is disabled in the settings' do
+      rate = Rate.create!(rate_valid_attributes)
+      assert rate.soft_delete
+
+      with_rate_lock_disabled do
+        assert !rate.editable?
+      end
+    end
+  end
+
+  context '#deleted?' do
+    should 'should be false for a new Rate' do
+      assert !Rate.new.deleted?
+    end
+
+    should 'should be true once soft-deleted' do
+      rate = Rate.create!(rate_valid_attributes)
+      rate.soft_delete
+      assert rate.deleted?
+    end
   end
 
   context 'with the rate lock disabled' do
@@ -128,6 +155,28 @@ class RateTest < ActiveSupport::TestCase
     end
   end
 
+  context 'timestamps' do
+    should 'set created_on and updated_on when created' do
+      rate = Rate.generate!
+
+      assert_not_nil rate.created_on
+      assert_not_nil rate.updated_on
+    end
+
+    should 'advance updated_on but not created_on on a later save' do
+      rate = Rate.generate!
+      # Backdate created_on (bypassing callbacks) so the assertion below doesn't
+      # depend on clock precision between the two saves.
+      rate.update_column(:created_on, 1.hour.ago)
+      original_created_on = rate.reload.created_on
+
+      rate.update(amount: rate.amount + 1)
+
+      assert_equal original_created_on, rate.reload.created_on
+      assert_operator rate.updated_on, :>, original_created_on
+    end
+  end
+
   context '#destroy' do
     should 'should destroy the Rate if should is unlocked' do
       rate = Rate.create(rate_valid_attributes)
@@ -143,6 +192,90 @@ class RateTest < ActiveSupport::TestCase
       assert_difference('Rate.count', 0) do
         rate.destroy
       end
+    end
+  end
+
+  context '#soft_delete' do
+    should 'should set deleted_on and leave the row in the table if the Rate is unlocked' do
+      rate = Rate.create!(rate_valid_attributes)
+
+      assert_no_difference('Rate.count') do
+        assert rate.soft_delete
+      end
+
+      assert rate.reload.deleted?
+      assert_not_nil rate.deleted_on
+    end
+
+    should 'should bump updated_on' do
+      rate = Rate.create!(rate_valid_attributes)
+      rate.update_column(:updated_on, 1.hour.ago)
+      original_updated_on = rate.reload.updated_on
+
+      rate.soft_delete
+
+      assert_operator rate.reload.updated_on, :>, original_updated_on
+    end
+
+    should 'should refresh the cached cost of the user\'s Time Entries' do
+      user = User.generate!
+      project = Project.generate!
+      date = Time.zone.today.to_s
+      rate = Rate.generate!(user: user, project: project, date_in_effect: date, amount: 200.0)
+      time_entry = TimeEntry.generate!(user: user,
+                                        project: project,
+                                        spent_on: date,
+                                        hours: 10.0,
+                                        activity: TimeEntryActivity.generate!)
+      assert_equal 2000.0, time_entry.reload.cost.to_f
+
+      with_rate_lock_disabled { rate.soft_delete }
+
+      assert_equal 0, TimeEntry.find(time_entry.id).cost.to_f
+    end
+
+    should 'should not soft-delete the Rate if it is locked' do
+      rate = Rate.create!(rate_valid_attributes)
+      rate.time_entries << TimeEntry.generate!
+
+      assert_no_difference('Rate.count') do
+        assert !rate.soft_delete
+      end
+
+      assert !rate.reload.deleted?
+    end
+
+    should 'should soft-delete a locked Rate when the lock is disabled in the settings' do
+      rate = Rate.create!(rate_valid_attributes)
+      rate.time_entries << TimeEntry.generate!
+
+      with_rate_lock_disabled do
+        assert rate.soft_delete
+      end
+
+      assert rate.reload.deleted?
+    end
+
+    should 'should be idempotent on an already-deleted Rate' do
+      rate = Rate.create!(rate_valid_attributes)
+      rate.soft_delete
+      deleted_on = rate.reload.deleted_on
+
+      assert rate.soft_delete
+      assert_equal deleted_on, rate.reload.deleted_on
+    end
+  end
+
+  context '.not_deleted / .deleted scopes' do
+    should 'should partition live and deleted Rates' do
+      live_rate = Rate.create!(rate_valid_attributes)
+      deleted_rate = Rate.create!(rate_valid_attributes)
+      deleted_rate.soft_delete
+
+      assert_includes Rate.not_deleted, live_rate
+      refute_includes Rate.not_deleted, deleted_rate
+      assert_includes Rate.deleted, deleted_rate
+      refute_includes Rate.deleted, live_rate
     end
   end
 

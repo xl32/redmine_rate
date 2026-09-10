@@ -27,6 +27,18 @@ class RateTimeEntryPatchTest < ActiveSupport::TestCase
       @time_entry.rate = rate
       assert_equal rate.amount * @time_entry.hours, @time_entry.cost
     end
+
+    should 'fall back to the next applicable rate when the assigned rate is soft-deleted' do
+      # @time_entry isn't saved yet, so @rate has no time entries of its own
+      # and is unlocked -- soft_delete succeeds outright. The belongs_to
+      # association still resolves the now-deleted row (it's still in the
+      # table), and #costinfo must not price the entry off it regardless.
+      older_rate = Rate.generate!(user: @user, project: @project, date_in_effect: 1.month.ago.to_s, amount: 50.0)
+      assert @rate.soft_delete
+      @time_entry.rate = @rate
+
+      assert_equal older_rate.amount * @time_entry.hours, @time_entry.cost
+    end
   end
 
   context '#cost' do

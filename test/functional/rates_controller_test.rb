@@ -114,7 +114,29 @@ class RatesControllerTest < ActionController::TestCase
         assert_equal assigns(:rates), [@mock_rate]
       end
 
+      should 'should exclude deleted rates from @rates' do
+        @mock_rate.soft_delete
+
+        get :index, params: { user_id: @user.id }
+
+        assert_equal [], assigns(:rates)
+      end
+
       context 'via the read-only REST API' do
+        should 'include deleted rates, flagged, in the response' do
+          @mock_rate.soft_delete
+
+          with_settings rest_api_enabled: '1' do
+            get :index, params: { user_id: @user.id, key: @user.api_key }, format: 'json'
+          end
+
+          assert_response :success
+          json = ActiveSupport::JSON.decode(response.body)
+          assert_equal 1, json['total_count']
+          assert_equal true, json['rates'].first['deleted']
+          assert_not_nil json['rates'].first['deleted_on']
+        end
+
         should 'render all rates as xml' do
           with_settings rest_api_enabled: '1' do
             get :index, params: { user_id: @user.id, key: @user.api_key }, format: 'xml'
@@ -126,7 +148,10 @@ class RatesControllerTest < ActionController::TestCase
               assert_select 'id', text: @mock_rate.id.to_s
               assert_select 'amount', text: /100/
               assert_select 'date_in_effect'
+              assert_select 'created_on'
+              assert_select 'updated_on'
               assert_select 'locked', text: 'false'
+              assert_select 'deleted', text: 'false'
             end
           end
         end
@@ -140,6 +165,10 @@ class RatesControllerTest < ActionController::TestCase
           json = ActiveSupport::JSON.decode(response.body)
           assert_kind_of Array, json['rates']
           assert_equal @mock_rate.id, json['rates'].first['id']
+          assert json['rates'].first.key?('created_on')
+          assert json['rates'].first.key?('updated_on')
+          assert_equal false, json['rates'].first['deleted']
+          assert_nil json['rates'].first['deleted_on']
         end
       end
     end
@@ -154,7 +183,30 @@ class RatesControllerTest < ActionController::TestCase
         assert_equal assigns(:rate), @mock_rate
       end
 
+      context 'on a deleted rate' do
+        setup do
+          @mock_rate.soft_delete
+        end
+
+        should 'should return 404 through the web UI' do
+          get :show, params: { id: @mock_rate.id }
+
+          assert_response :not_found
+        end
+      end
+
       context 'via the read-only REST API' do
+        should 'should expose a deleted rate' do
+          @mock_rate.soft_delete
+
+          with_settings rest_api_enabled: '1' do
+            get :show, params: { id: @mock_rate.id, key: @user.api_key }, format: 'json'
+          end
+
+          assert_response :success
+          assert_equal true, ActiveSupport::JSON.decode(response.body)['rate']['deleted']
+        end
+
         should 'render the requested rate as xml' do
           with_settings rest_api_enabled: '1' do
             get :show, params: { id: @mock_rate.id, key: @user.api_key }, format: 'xml'
@@ -164,8 +216,11 @@ class RatesControllerTest < ActionController::TestCase
           assert_select 'rate' do
             assert_select 'id', text: @mock_rate.id.to_s
             assert_select 'amount', text: /100/
+            assert_select 'created_on'
+            assert_select 'updated_on'
             assert_select 'locked', text: 'false'
             assert_select 'editable', text: 'true'
+            assert_select 'deleted', text: 'false'
           end
         end
 
@@ -177,6 +232,10 @@ class RatesControllerTest < ActionController::TestCase
           assert_response :success
           json = ActiveSupport::JSON.decode(response.body)
           assert_equal @mock_rate.id, json['rate']['id']
+          assert json['rate'].key?('created_on')
+          assert json['rate'].key?('updated_on')
+          assert_equal false, json['rate']['deleted']
+          assert_nil json['rate']['deleted_on']
         end
       end
     end
@@ -234,6 +293,18 @@ class RatesControllerTest < ActionController::TestCase
       should 'should expose the requested rate as @rate' do
         get :edit, params: { id: @mock_rate.id }
         assert_equal assigns(:rate), @mock_rate
+      end
+
+      context 'on a deleted rate' do
+        setup do
+          @mock_rate.soft_delete
+        end
+
+        should 'should return 404' do
+          get :edit, params: { id: @mock_rate.id }
+
+          assert_response :not_found
+        end
       end
 
       should "should keep the rate's own date in the date picker" do
@@ -410,6 +481,31 @@ class RatesControllerTest < ActionController::TestCase
           assert_redirected_to rates_url(user_id: @user.id)
         end
       end
+
+      context 'on a deleted rate' do
+        setup do
+          mock_rate
+          @mock_rate.soft_delete
+        end
+
+        should 'should not save the rate' do
+          put :update, params: { id: @mock_rate.id, rate: { amount: 150 } }
+
+          assert_equal 100, @mock_rate.reload.amount
+        end
+
+        should "should re-render the 'edit' template" do
+          put :update, params: { id: @mock_rate.id, rate: { amount: 150 } }
+
+          assert_template 'edit'
+        end
+
+        should 'should render an error message' do
+          put :update, params: { id: @mock_rate.id, rate: { amount: 150 } }
+
+          assert_match(/deleted/, flash[:error])
+        end
+      end
     end
 
     context 'responding to DELETE destroy' do
@@ -417,9 +513,11 @@ class RatesControllerTest < ActionController::TestCase
         mock_rate
       end
 
-      should 'should destroy the requested rate' do
-        assert_difference('Rate.count', -1) do
-          delete :destroy, params: { id: @mock_rate.id }
+      should 'should soft-delete the requested rate' do
+        assert_no_difference('Rate.count') do
+          assert_difference('Rate.deleted.count', 1) do
+            delete :destroy, params: { id: @mock_rate.id }
+          end
         end
       end
 
@@ -445,9 +543,11 @@ class RatesControllerTest < ActionController::TestCase
           assert_match(/locked/, flash[:error])
         end
 
-        should 'should destroy the rate when the lock is disabled in the settings' do
-          assert_difference('Rate.count', -1) do
-            with_rate_lock_disabled { delete :destroy, params: { id: @mock_rate.id } }
+        should 'should soft-delete the rate when the lock is disabled in the settings' do
+          assert_no_difference('Rate.count') do
+            assert_difference('Rate.deleted.count', 1) do
+              with_rate_lock_disabled { delete :destroy, params: { id: @mock_rate.id } }
+            end
           end
 
           assert_redirected_to rates_url(user_id: @user.id)
@@ -474,6 +574,23 @@ class RatesControllerTest < ActionController::TestCase
         assert_response :created
         json = ActiveSupport::JSON.decode(response.body)
         assert_equal 75.0, json['rate']['amount'].to_f
+      end
+
+      should 'ignore a submitted created_on and stamp the server time instead' do
+        forged_created_on = 10.years.ago
+        with_settings rest_api_enabled: '1' do
+          post :create,
+               params: { key: @user.api_key,
+                         rate: { project_id: @project.id, amount: '75',
+                                 date_in_effect: Time.zone.today.to_s, user_id: @user.id,
+                                 created_on: forged_created_on.to_s } },
+               format: 'json'
+        end
+
+        assert_response :created
+        json = ActiveSupport::JSON.decode(response.body)
+        created_rate = Rate.find(json['rate']['id'])
+        assert_operator created_rate.created_on, :>, 1.hour.ago
       end
 
       should 'return 422 when creating with invalid params' do
@@ -516,10 +633,39 @@ class RatesControllerTest < ActionController::TestCase
         assert_equal 175.0, rate.reload.amount
       end
 
-      should 'delete a rate and return 204' do
+      should 'soft-delete a rate and return 204' do
         rate = mock_rate
         with_settings rest_api_enabled: '1' do
-          assert_difference 'Rate.count', -1 do
+          assert_no_difference 'Rate.count' do
+            assert_difference 'Rate.deleted.count', 1 do
+              delete :destroy, params: { key: @user.api_key, id: rate.id }, format: 'json'
+            end
+          end
+        end
+
+        assert_response :no_content
+        assert rate.reload.deleted?
+      end
+
+      should 'return 422 when deleting a locked rate' do
+        rate = mock_locked_rate
+        with_settings rest_api_enabled: '1' do
+          assert_no_difference 'Rate.count' do
+            assert_no_difference 'Rate.deleted.count' do
+              delete :destroy, params: { key: @user.api_key, id: rate.id }, format: 'json'
+            end
+          end
+        end
+
+        assert_response 422
+      end
+
+      should 'return 204 and stay deleted when deleting an already-deleted rate' do
+        rate = mock_rate
+        with_settings rest_api_enabled: '1' do
+          delete :destroy, params: { key: @user.api_key, id: rate.id }, format: 'json'
+
+          assert_no_difference 'Rate.deleted.count' do
             delete :destroy, params: { key: @user.api_key, id: rate.id }, format: 'json'
           end
         end
@@ -527,15 +673,16 @@ class RatesControllerTest < ActionController::TestCase
         assert_response :no_content
       end
 
-      should 'return 422 when deleting a locked rate' do
-        rate = mock_locked_rate
+      should 'return 422 when updating a deleted rate' do
+        rate = mock_rate
         with_settings rest_api_enabled: '1' do
-          assert_no_difference 'Rate.count' do
-            delete :destroy, params: { key: @user.api_key, id: rate.id }, format: 'json'
-          end
+          delete :destroy, params: { key: @user.api_key, id: rate.id }, format: 'json'
+
+          put :update, params: { key: @user.api_key, id: rate.id, rate: { amount: 999.0 } }, format: 'json'
         end
 
         assert_response 422
+        assert_equal 100.0, rate.reload.amount
       end
     end
   end

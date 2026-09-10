@@ -22,6 +22,9 @@ to query stored rates.
   projects
 * +Rate.for+ Ruby API for other plugins
 * Read-only REST API (XML/JSON) to query rates
+* Soft-delete rates: a deleted rate disappears from the web UI, but stays in
+  the REST API with a +deleted+ flag, so an incremental import can detect the
+  deletion
 * Flag time entries as billable (with bulk support)
 
 == Installation
@@ -101,6 +104,18 @@ which is what you want when a rate was entered incorrectly. The time entries
 stay assigned to the rate; only their cached cost is recalculated, so correcting
 a rate amount also corrects the costs already booked against it.
 
+=== Deleting a rate
+
+Deleting a rate (from the web UI or the REST API) is a soft delete: the rate
+disappears from the web UI and no longer applies to any cost calculation, but
+the row is kept rather than removed. This lets a system that mirrors rates
+through the REST API (an external database, a reporting tool, ...) detect the
+deletion on its next incremental sync, by noticing the +deleted+ flag and the
+updated +updated_on+ timestamp -- see "List a user's rate history" below.
+A deleted rate can no longer be edited, and deleting it again is a no-op.
+Restoring a deleted rate has no web UI or API and is a console-only operation
+for administrators.
+
 === Caching
 
 The plugin caches the total cost of each time entry in the database instead of
@@ -138,7 +153,12 @@ Prerequisites:
   GET /rates.json?user_id=:user_id
   GET /rates.xml?user_id=:user_id
 
-The +user_id+ parameter is required; an unknown user returns 404.
+Omitting +user_id+ lists rates for all users; a +project_id+ parameter narrows
+the list to that project's rates, and +offset+/+limit+/+page+ paginate it. An
+unknown user or project (when given) returns 404. The list always includes
+deleted rates alongside live ones -- see +deleted+ below -- so an incremental
+consumer must inspect that flag rather than expect deleted rates to simply
+disappear from the response.
 
   curl -H "X-Redmine-API-Key: <admin_api_key>" \
        "https://redmine.example.com/rates.json?user_id=42"
@@ -149,8 +169,12 @@ The +user_id+ parameter is required; an unknown user returns 404.
         "id": 7,
         "amount": "100.0",
         "date_in_effect": "2026-01-01",
+        "created_on": "2026-01-01T00:00:00Z",
+        "updated_on": "2026-01-01T00:00:00Z",
         "locked": false,
         "editable": true,
+        "deleted": false,
+        "deleted_on": null,
         "user": { "id": 42, "name": "Jane Doe" },
         "project": { "id": 3, "name": "Website" }
       }
@@ -158,8 +182,11 @@ The +user_id+ parameter is required; an unknown user returns 404.
   }
 
 A rate without a +project+ element is the user's default rate. +locked+ is true
-when the rate already has time entries. +editable+ tells whether the rate still
-accepts writes: it is false only for a locked rate while the rate lock is
+when the rate already has time entries. +deleted+ is true once the rate has
+been (soft-)deleted, with +deleted_on+ carrying the timestamp; a deleted rate's
++updated_on+ is bumped at the same time, which an incremental sync can use to
+notice the deletion. +editable+ tells whether the rate still accepts writes: it
+is false for a deleted rate, and also false for a locked rate while the rate lock is
 enabled (see "Lock a rate" above).
 
 === Show a single rate
@@ -175,8 +202,12 @@ enabled (see "Lock a rate" above).
     <id>7</id>
     <amount>100.0</amount>
     <date_in_effect>2026-01-01</date_in_effect>
+    <created_on>2026-01-01T00:00:00Z</created_on>
+    <updated_on>2026-01-01T00:00:00Z</updated_on>
     <locked>false</locked>
     <editable>true</editable>
+    <deleted>false</deleted>
+    <deleted_on nil="true"/>
     <user id="42" name="Jane Doe"/>
     <project id="3" name="Website"/>
   </rate>
@@ -214,8 +245,10 @@ rate lock" is checked in the plugin settings.
   DELETE /rates/:id.json
   DELETE /rates/:id.xml
 
-Returns 204 No Content on success. A locked rate cannot be deleted and returns
-422, unless "Disable rate lock" is checked in the plugin settings.
+Soft-deletes the rate (see "Deleting a rate" above) and returns 204 No
+Content -- including when the rate was already deleted. A locked rate cannot
+be deleted and returns 422, unless "Disable rate lock" is checked in the
+plugin settings. Updating a deleted rate also returns 422.
 
   curl -X DELETE -H "X-Redmine-API-Key: <admin_api_key>" \
        "https://redmine.example.com/rates/7.json"

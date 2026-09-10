@@ -75,7 +75,11 @@ module RedmineRate
           info = { rate_id: nil, cost: 0.0 }
           return info unless billable
 
-          if rate.nil?
+          # A soft-deleted rate must be treated the same as no rate at all,
+          # even though the belongs_to association still resolves it (the row
+          # is still there) -- otherwise a deleted rate would keep pricing
+          # every time entry that happened to already reference it.
+          if rate.nil? || rate.deleted?
             r = Rate.for(user, project, spent_on.to_s)
             return info unless r
             rate_id = r.id

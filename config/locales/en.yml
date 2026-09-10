@@ -13,6 +13,7 @@ en:
   permission_activate_billable: Activate billable
   permission_view_rate: Show rate
   rate_created_message: Rate was successfully created.
+  rate_deleted_message: Rate is deleted and cannot be edited
   rate_error_creating_new_rate: Error creating a new rate.
   rate_error_user_not_found: User not found
   rate_label_currency: Currency

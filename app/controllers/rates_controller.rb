@@ -15,6 +15,7 @@ class RatesController < ApplicationController
 
   VALID_SORT_OPTIONS = {
     'date_in_effect' => "#{Rate.table_name}.date_in_effect",
+    'updated_on' => "#{Rate.table_name}.updated_on",
     'project_id' => "#{Project.table_name}.name"
   }.freeze
 
@@ -26,11 +27,13 @@ class RatesController < ApplicationController
     sort_update VALID_SORT_OPTIONS
 
     scope = Rate.history(sort_clause, user: @user, project: @project)
-    @rates = scope
+    @rates = scope.not_deleted
 
     respond_to do |format|
       format.html { render action: 'index', layout: !request.xhr? }
       format.api do
+        # Deleted rates stay in the API response (with a `deleted` flag) so an
+        # incremental importer can detect the deletion via `updated_on`.
         @rate_count = scope.count
         @offset, @limit = api_offset_and_limit
         @rates = scope.limit(@limit).offset(@offset).to_a
@@ -44,6 +47,7 @@ class RatesController < ApplicationController
   # GET /rates/1.json
   def show
     @rate = Rate.find(params[:id])
+    return render_404 if @rate.deleted? && !api_request?
 
     respond_to do |format|
       format.html # show.html.erb
@@ -59,6 +63,7 @@ class RatesController < ApplicationController
   # GET /rates/1/edit
   def edit
     @rate = Rate.find(params[:id])
+    return render_404 if @rate.deleted?
   end
 
   # POST /rates
@@ -92,6 +97,20 @@ class RatesController < ApplicationController
   def update
     @rate = Rate.find(params[:id])
 
+    # A deleted rate can no longer be edited. This has to be checked
+    # explicitly here: #ensure_unlocked (before_save) only guards the lock, not
+    # the deleted state, so that soft_delete's own save -- and a console-only
+    # restore/purge of a deleted rate -- are never blocked by that callback.
+    if @rate.deleted?
+      flash[:error] = l(:rate_deleted_message)
+      @rate.errors.add(:base, l(:rate_deleted_message))
+      respond_to do |format|
+        format.html { render action: 'edit' }
+        format.api { render_validation_errors(@rate) }
+      end
+      return
+    end
+
     respond_to do |format|
       # Locked rates will fail saving here (before_save aborts the callback chain),
       # unless the lock has been disabled in the plugin settings.
@@ -116,16 +135,16 @@ class RatesController < ApplicationController
   # DELETE /rates/1.json
   def destroy
     @rate = Rate.find(params[:id])
-    destroyed = @rate.destroy
+    destroyed = @rate.soft_delete
 
     respond_to do |format|
       format.html do
         if destroyed
           flash[:notice] = 'Rate was deleted.'
-          redirect_back_or_default rates_url(user_id: @rate.user_id)
         else
           flash[:error] = 'Rate is locked and cannot be deleted'
         end
+        redirect_back_or_default rates_url(user_id: @rate.user_id)
       end
       format.api do
         if destroyed

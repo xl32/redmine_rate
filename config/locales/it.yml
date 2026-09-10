@@ -13,6 +13,7 @@ it:
   permission_activate_billable: Activate billable
   permission_view_rate: Mostra rata
   rate_created_message: Rata creazione effettuata.
+  rate_deleted_message: "La rata è eliminata e non può essere modificata"
   rate_error_creating_new_rate: Impossibile creare un nuova rata.
   rate_error_user_not_found: Utenti non trovati
   rate_label_currency: Valuta

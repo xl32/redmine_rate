@@ -63,5 +63,38 @@ class RateForTest < ActiveSupport::TestCase
         assert_equal rate, Rate.for(@user, project)
       end
     end
+
+    context 'a user with a soft-deleted Rate' do
+      should 'should fall through to the default Rate when the project Rate is deleted' do
+        project = Project.generate!
+        default_rate = Rate.create!(user_id: @user.id, amount: 100.0, date_in_effect: Time.zone.today)
+        project_rate = Rate.create!(user_id: @user.id, project: project, amount: 300.0, date_in_effect: Time.zone.today)
+        assert project_rate.soft_delete
+
+        assert_equal default_rate, Rate.for(@user, project)
+      end
+
+      should 'should skip a deleted Rate and fall back to the next-most-recent one' do
+        older_rate = Rate.create!(user_id: @user.id, amount: 100.0, date_in_effect: 1.month.ago)
+        newer_rate = Rate.create!(user_id: @user.id, amount: 200.0, date_in_effect: Time.zone.today)
+        assert newer_rate.soft_delete
+
+        assert_equal older_rate, Rate.for(@user)
+      end
+
+      should 'should return nil when the only Rate is deleted' do
+        rate = Rate.create!(user_id: @user.id, amount: 100.0, date_in_effect: Time.zone.today)
+        assert rate.soft_delete
+
+        assert_nil Rate.for(@user)
+      end
+
+      should 'should return nil from amount_for when the only Rate is deleted' do
+        rate = Rate.create!(user_id: @user.id, amount: 100.0, date_in_effect: Time.zone.today)
+        assert rate.soft_delete
+
+        assert_nil Rate.amount_for(@user)
+      end
+    end
   end
 end

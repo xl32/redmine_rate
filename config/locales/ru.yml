@@ -13,6 +13,7 @@ ru:
   permission_activate_billable: Activate billable
   permission_view_rate: Show rate
   rate_created_message: Rate was successfully created.
+  rate_deleted_message: Часовая ставка удалена и не может быть изменена
   rate_error_creating_new_rate: Error creating a new rate.
   rate_error_user_not_found: Пользователь не найден
   rate_label_currency: Currency

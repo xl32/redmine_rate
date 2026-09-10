@@ -13,10 +13,13 @@ module RedmineRate
         source = context[:source_project]
         destination = context[:destination_project]
 
-        Rate.where(project_id: source.id).each do |source_rate|
+        Rate.where(project_id: source.id).not_deleted.each do |source_rate|
           destination_rate = Rate.new
 
-          destination_rate.attributes = source_rate.attributes.except('project_id')
+          # created_on/updated_on must not carry over: the copy is a new record, and
+          # Rails' timestamp callbacks only fill a column that is still nil.
+          # deleted_on must not carry over either -- a copy is never born deleted.
+          destination_rate.attributes = source_rate.attributes.except('project_id', 'created_on', 'updated_on', 'deleted_on')
           destination_rate.project = destination
           destination_rate.save # Need to save here because there is no relation on project to rate
         end

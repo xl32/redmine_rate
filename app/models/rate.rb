@@ -1,6 +1,8 @@
 require 'lockfile'
 
 class Rate < ActiveRecord::Base
+  # created_on/updated_on (Redmine's timestamp naming, added in migration 006) are
+  # maintained automatically by ActiveRecord::Timestamp -- no callback needed here.
   class InvalidParameterException < RuntimeError; end
   CACHING_LOCK_FILE_NAME = 'rate_cache'.freeze
 
@@ -23,7 +25,9 @@ class Rate < ActiveRecord::Base
   before_destroy :ensure_unlocked
   after_destroy :update_time_entry_cost_cache
 
-  scope :history_for_user, (->(user, order) { where(user_id: user.id).order(order).includes(:project) })
+  scope :history_for_user, (->(user, order) { where(user_id: user.id, deleted_on: nil).order(order).includes(:project) })
+  scope :not_deleted, (-> { where(deleted_on: nil) })
+  scope :deleted, (-> { where.not(deleted_on: nil) })
 
   def self.history(sort_clause, user: nil, project: nil)
     scope = order(sort_clause).includes(:project).references(:project)
@@ -46,10 +50,17 @@ class Rate < ActiveRecord::Base
     !locked?
   end
 
-  # Whether the rate may still be edited or deleted: either it has no time
-  # entries yet, or the lock has been disabled in the plugin settings.
-  def editable?
+  # Whether the lock (see #locked?) permits writes: either the rate has no
+  # time entries yet, or the lock has been disabled in the plugin settings.
+  # Deliberately independent of #deleted? -- see #ensure_unlocked below.
+  def lock_permits_write?
     unlocked? || !Rate.lock_enforced?
+  end
+
+  # Whether the rate may still be edited or deleted through the web UI/API:
+  # it must not already be deleted, and the lock must permit writes.
+  def editable?
+    !deleted? && lock_permits_write?
   end
 
   def default?
@@ -58,6 +69,28 @@ class Rate < ActiveRecord::Base
 
   def specific?
     !default?
+  end
+
+  def deleted?
+    deleted_on.present?
+  end
+
+  # Soft-deletes the rate: sets +deleted_on+ instead of removing the row, so
+  # the REST API can still report the deletion to incremental consumers.
+  # Refuses exactly where #destroy would (a locked rate with the lock enforced).
+  #
+  # A plain #save(validate: false): #ensure_unlocked only checks
+  # #lock_permits_write?, not #deleted?, so setting +deleted_on+ does not trip
+  # its own guard. Going through the normal save chain also means
+  # +updated_on+ is bumped automatically and #update_time_entry_cost_cache
+  # fires via the existing after_save, same as any other change. Skipping
+  # validation keeps a pre-existing invalid rate deletable.
+  def soft_delete
+    return true if deleted?
+    return false unless editable?
+
+    self.deleted_on = Time.current
+    save(validate: false)
   end
 
   # API to find the Rate for a +user+ on a +project+ at a +date+
@@ -109,11 +142,13 @@ class Rate < ActiveRecord::Base
 
   def self.for_user_project_and_date(user, project, date)
     if project.nil?
-      Rate.where('user_id IN (?) AND date_in_effect <= ? AND project_id IS NULL', user.id, date)
+      Rate.not_deleted
+          .where('user_id IN (?) AND date_in_effect <= ? AND project_id IS NULL', user.id, date)
           .order('date_in_effect DESC')
           .first
     else
-      Rate.where('user_id IN (?) AND project_id IN (?) AND date_in_effect <= ?', user.id, project.id, date)
+      Rate.not_deleted
+          .where('user_id IN (?) AND project_id IN (?) AND date_in_effect <= ?', user.id, project.id, date)
           .order('date_in_effect DESC')
           .first
     end
@@ -159,10 +194,14 @@ class Rate < ActiveRecord::Base
   private
 
   # Halts the save/destroy callback chain when the rate is locked (has time
-  # entries). Kept separate from #unlocked?, which must stay a plain predicate
-  # for controllers and views.
+  # entries). Deliberately checks #lock_permits_write?, not #editable? --
+  # #editable? also folds in #deleted?, and this callback must NOT abort a
+  # save/destroy on a soft-deleted rate: #soft_delete itself is a save that
+  # sets +deleted_on+, and console-only restoration/purging of a deleted rate
+  # (there is no UI/API for either) must keep working through plain
+  # ActiveRecord calls.
   def ensure_unlocked
-    throw :abort unless editable?
+    throw :abort unless lock_permits_write?
   end
 
   def update_time_entry_cost_cache
